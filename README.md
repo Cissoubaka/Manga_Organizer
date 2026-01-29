@@ -2,9 +2,10 @@
 Permet de gerer sa collection de manga, importation, volumes manquants,.....
 
 ## A installer
-- amulecmd
-- module python : Flask, rarfile, ebooklib, PyPDF2
-- un crontab comme par exemple une fois par semaine pour scraper.py
+- amulecmd ``sudo apt install amule-utils``
+- module python : voir le fichier requirement.txt :
+  ```pip install -r requirements.txt```
+- un crontab, comme par exemple une fois par semaine pour scraper.py
   
 
 
@@ -24,4 +25,5 @@ Permet de gerer sa collection de manga, importation, volumes manquants,.....
 ### Correction a venir
 - détection correcte des volumes par scraper.py
 - cliquer sur le volume manquant le recherche dans la bdd edbz
+- suppression des bouton parcourir qui ne fonctionnent pas
 - ...

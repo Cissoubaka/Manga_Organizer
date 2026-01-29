@@ -1,6 +1,11 @@
 # Manga_Organizer
 Permet de gerer sa collection de manga, importation, volumes manquants,.....
 
+## A installer
+- amulecmd
+- module python : Flask, rarfile, ebooklib, PyPDF2
+- un crontab comme par exemple une fois par semaine pour scraper.py
+  
 
 
 ## app.py
@@ -9,6 +14,7 @@ Permet de gerer sa collection de manga, importation, volumes manquants,.....
 - afficher les volumes manquants dans les séries
 - rechercher les séries/volumes dans la base de données obtenu par scraper.py
 - configuration de amule directement sur la page web
+
 
 
 ## scraper.py

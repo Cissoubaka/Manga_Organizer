@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bibliothèque Manga</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 id="library-title">📚 Bibliothèque</h1>
+                    <p class="subtitle" id="library-path">Chargement...</p>
+                </div>
+                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="controls">
+                <button class="btn" onclick="scanLibrary()">🔄 Scanner la bibliothèque</button>
+                <button class="btn" onclick="loadLibraryData()">📖 Recharger les données</button>
+                <button class="btn" onclick="window.location.href='/import'" style="background: #f59e0b;">📥 Import de mangas</button>
+                <button class="btn" id="filter-btn" onclick="toggleMissingFilter()">⚠️ Volumes manquants uniquement</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Séries</div>
+                    <div class="stat-value" id="series-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Volumes</div>
+                    <div class="stat-value" id="volumes-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Taille totale</div>
+                    <div class="stat-value" id="total-size">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pages moyennes</div>
+                    <div class="stat-value" id="avg-pages">-</div>
+                </div>
+            </div>
+
+            <input type="text" class="search-box" id="search" 
+                   placeholder="🔍 Rechercher une série..." 
+                   onkeyup="filterSeries()">
+
+            <div class="series-grid" id="series-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Chargement des données...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="series-modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">×</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        const libraryId = {{ library_id }};
+        let seriesData = [];
+        let showOnlyMissing = false;
+
+        async function loadLibraryInfo() {
+            try {
+                const response = await fetch(`/api/libraries/${libraryId}`);
+                const library = await response.json();
+                
+                document.getElementById('library-title').textContent = `📚 ${library.name}`;
+                document.getElementById('library-path').textContent = library.path;
+            } catch (error) {
+                console.error('Erreur chargement bibliothèque:', error);
+            }
+        }
+
+        async function loadLibraryData() {
+            const grid = document.getElementById('series-grid');
+            grid.innerHTML = '<div class="loading"><div class="spinner"></div><p>Chargement des données...</p></div>';
+
+            try {
+                const [seriesResponse, statsResponse] = await Promise.all([
+                    fetch(`/api/library/${libraryId}/series`),
+                    fetch(`/api/library/${libraryId}/stats`)
+                ]);
+
+                const series = await seriesResponse.json();
+                const stats = await statsResponse.json();
+
+                seriesData = series;
+                updateStats(stats);
+                displaySeries(series);
+            } catch (error) {
+                grid.innerHTML = `<div class="no-data"><h3>Erreur de chargement</h3><p>${error.message}</p></div>`;
+            }
+        }
+
+        function updateStats(stats) {
+            document.getElementById('series-count').textContent = stats.total_series;
+            document.getElementById('volumes-count').textContent = stats.total_volumes;
+            document.getElementById('total-size').textContent = formatBytes(stats.total_size);
+            document.getElementById('avg-pages').textContent = stats.avg_pages;
+        }
+
+        function displaySeries(series) {
+            const grid = document.getElementById('series-grid');
+            
+            if (series.length === 0) {
+                grid.innerHTML = '<div class="no-data"><span class="no-data-icon">📚</span><h3>Aucune série trouvée</h3><p>Scannez votre bibliothèque pour commencer</p></div>';
+                return;
+            }
+
+            grid.innerHTML = series.map(s => `
+                <div class="series-card" onclick="viewSeries(${s.id})">
+                    <div class="series-title">${escapeHtml(s.title)}</div>
+                    <div class="series-info">📖 ${s.total_volumes} volume(s)</div>
+                    <div class="series-info">📅 Dernier scan: ${new Date(s.last_scanned).toLocaleDateString('fr-FR')}</div>
+                    ${s.missing_volumes.length > 0 ? 
+                        `<div class="missing-volumes">⚠️ Volumes manquants: ${s.missing_volumes.join(', ')}</div>` :
+                        `<div class="complete">✅ Collection complète</div>`
+                    }
+                </div>
+            `).join('');
+        }
+
+        function filterSeries() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            let filtered = seriesData.filter(s => 
+                s.title.toLowerCase().includes(searchTerm)
+            );
+            
+            if (showOnlyMissing) {
+                filtered = filtered.filter(s => s.missing_volumes.length > 0);
+            }
+            
+            displaySeries(filtered);
+        }
+
+        function toggleMissingFilter() {
+            showOnlyMissing = !showOnlyMissing;
+            const btn = document.getElementById('filter-btn');
+            
+            if (showOnlyMissing) {
+                btn.textContent = '✅ Afficher toutes les séries';
+                btn.style.background = '#10b981';
+            } else {
+                btn.textContent = '⚠️ Volumes manquants uniquement';
+                btn.style.background = '#667eea';
+            }
+            
+            filterSeries();
+        }
+
+        async function scanLibrary() {
+            if (!confirm('Voulez-vous scanner cette bibliothèque ? Cela peut prendre du temps.')) {
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = '⏳ Scan en cours...';
+
+            try {
+                const response = await fetch(`/api/scan/${libraryId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Scan terminé ! ${data.series_count} séries trouvées.`);
+                    await loadLibraryData();
+                } else {
+                    alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = '🔄 Scanner la bibliothèque';
+            }
+        }
+
+        async function viewSeries(seriesId) {
+            const modal = document.getElementById('series-modal');
+            const modalBody = document.getElementById('modal-body');
+            
+            modal.classList.add('active');
+            modalBody.innerHTML = '<div class="loading"><div class="spinner"></div><p>Chargement des détails...</p></div>';
+
+            try {
+                const response = await fetch(`/api/series/${seriesId}`);
+                const data = await response.json();
+                
+                console.log('Données reçues:', data);
+
+                let volumesHtml = '';
+                
+                if (data.has_parts && data.parts) {
+                    const partNumbers = Object.keys(data.parts).sort((a, b) => parseInt(a) - parseInt(b));
+                    
+                    volumesHtml = partNumbers.map(partNum => {
+                        const part = data.parts[partNum];
+                        return `
+                            <div class="part-section">
+                                <div class="part-header">
+                                    <h3>📖 ${escapeHtml(part.name)}</h3>
+                                    <span class="part-count">${part.volumes.length} volume(s)</span>
+                                </div>
+                                <div class="volume-list">
+                                    ${part.volumes.map(v => `
+                                        <div class="volume-item">
+                                            <div class="volume-number">${v.volume_number || '?'}</div>
+                                            <div class="volume-details">
+                                                <div class="volume-filename">${escapeHtml(v.filename)}</div>
+                                                <div class="volume-meta">
+                                                    ${v.author ? `<span class="badge">👤 ${escapeHtml(v.author)}</span>` : ''}
+                                                    ${v.year ? `<span class="badge">📅 ${v.year}</span>` : ''}
+                                                    ${v.resolution ? `<span class="badge">🖼️ ${v.resolution}</span>` : ''}
+                                                    <span class="badge">📄 ${v.page_count} pages</span>
+                                                    <span class="badge">💾 ${formatBytes(v.file_size)}</span>
+                                                    <span class="badge">.${v.format.toUpperCase()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    volumesHtml = `
+                        <div class="volume-list">
+                            ${(data.volumes || []).map(v => `
+                                <div class="volume-item">
+                                    <div class="volume-number">${v.volume_number || '?'}</div>
+                                    <div class="volume-details">
+                                        <div class="volume-filename">${escapeHtml(v.filename)}</div>
+                                        <div class="volume-meta">
+                                            ${v.author ? `<span class="badge">👤 ${escapeHtml(v.author)}</span>` : ''}
+                                            ${v.year ? `<span class="badge">📅 ${v.year}</span>` : ''}
+                                            ${v.resolution ? `<span class="badge">🖼️ ${v.resolution}</span>` : ''}
+                                            <span class="badge">📄 ${v.page_count} pages</span>
+                                            <span class="badge">💾 ${formatBytes(v.file_size)}</span>
+                                            <span class="badge">.${v.format.toUpperCase()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                modalBody.innerHTML = `
+                    <div class="modal-header">
+                        <h2 class="modal-title">${escapeHtml(data.title)}</h2>
+                        <p class="modal-subtitle">
+                            ${data.total_volumes} volume(s) dans la collection
+                            ${data.has_parts ? ' • Série avec arcs/parties' : ''}
+                        </p>
+                        ${data.missing_volumes.length > 0 ? 
+                            `<div class="missing-volumes-section" style="margin-top: 20px;">
+                                <h3 class="missing-volumes-title">⚠️ Volumes manquants</h3>
+                                <div class="missing-volumes-grid">
+                                    ${data.missing_volumes.map(volNum => `
+                                        <div class="missing-volume-card">
+                                            <div class="missing-volume-number">${volNum}</div>
+                                            <div class="missing-volume-label">Vol. ${volNum}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>` : 
+                            `<div class="complete" style="margin-top: 15px;">
+                                ✅ Collection complète
+                            </div>`
+                        }
+                    </div>
+                    ${volumesHtml}
+                `;
+            } catch (error) {
+                modalBody.innerHTML = `<div class="no-data"><h3>Erreur</h3><p>${error.message}</p></div>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('series-modal').classList.remove('active');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('series-modal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        window.addEventListener('load', function() {
+            loadLibraryInfo();
+            loadLibraryData();
+        });
+    </script>
+</body>
+</html>

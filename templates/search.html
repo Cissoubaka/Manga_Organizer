@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recherche de liens ed2k</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-search.css') }}">
+</head>
+<body>
+    <div class="container">
+	    <header>
+            <div class="header-content">
+                <div class="header-left">
+                   <h1>🔍 Recherche ED2K</h1>
+            <p class="subtitle">Base de données de liens EmuleBDZ</p>
+                </div>
+                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+            </div>
+        </header>
+        <div class="header">
+            <div class="settings-icon" onclick="openSettings()">⚙️</div>
+        </div>
+
+        <div class="search-box">
+            <div class="search-input-group">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="Rechercher un manga, anime, film..."
+                    onkeypress="if(event.key === 'Enter') searchLinks()"
+                >
+                <input 
+                    type="number" 
+                    class="volume-input" 
+                    id="volumeInput" 
+                    placeholder="Volume n°"
+                    min="1"
+                    onkeypress="if(event.key === 'Enter') searchLinks()"
+                >
+                <select class="category-select" id="categorySelect">
+                    <option value="">Toutes les catégories</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <button class="search-button" onclick="searchLinks()">Rechercher</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalLinks">{{ total_links }}</div>
+                    <div class="stat-label">Liens totaux</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="totalThreads">{{ total_threads }}</div>
+                    <div class="stat-label">Threads</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barre de filtrage des résultats -->
+        <div class="filter-box" id="filterBox" style="display: none;">
+            <div class="filter-header">
+                <h3>📊 Filtrer les résultats</h3>
+                <button class="clear-filter-button" onclick="clearFilter()">🗑️ Réinitialiser</button>
+            </div>
+            <div class="filter-input-group">
+                <input 
+                    type="text" 
+                    class="filter-input" 
+                    id="filterInput" 
+                    placeholder="🔎 Filtrer par titre, fichier, volume..."
+                    onkeyup="filterResults()"
+                >
+                <div class="filter-stats">
+                    <span id="filteredCount">0</span> / <span id="totalCount">0</span> résultats
+                </div>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Modal des paramètres -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSettings()">&times;</span>
+            <h2>⚙️ Configuration aMule</h2>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="emuleEnabled">
+                <label for="emuleEnabled">Activer l'intégration aMule</label>
+            </div>
+
+            <div class="form-group">
+                <label for="emuleHost">Hôte</label>
+                <input type="text" id="emuleHost" value="127.0.0.1">
+            </div>
+
+            <div class="form-group">
+                <label for="emuleEcPort">Port External Connections (EC)</label>
+                <input type="number" id="emuleEcPort" value="4712">
+            </div>
+
+            <div class="form-group">
+                <label for="emulePassword">Mot de passe EC</label>
+                <input type="password" id="emulePassword" placeholder="Mot de passe aMule">
+            </div>
+
+            <button class="save-button" onclick="saveSettings()">Enregistrer</button>
+            <button class="test-button" onclick="testConnection()">Tester la connexion</button>
+            
+            <div id="settingsMessage" class="message"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -52,8 +52,11 @@ class LibraryScanner:
 
     def init_database(self):
         """Initialise la base de données"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         cursor = conn.cursor()
+        
+        # Activer le mode WAL (Write-Ahead Logging) pour de meilleures performances concurrentes
+        cursor.execute('PRAGMA journal_mode=WAL')
 
         # Table des bibliothèques
         cursor.execute('''
@@ -291,7 +294,7 @@ class LibraryScanner:
         print(f"✓ {len(series_data)} séries détectées")
 
         # Insérer/mettre à jour dans la base de données
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         cursor = conn.cursor()
 
         for series_title, data in series_data.items():
@@ -363,7 +366,7 @@ class LibraryScanner:
                 ))
 
             # Mettre à jour les statistiques de la série
-            self.update_series_stats(series_id)
+            self.update_series_stats(series_id, conn)
 
         # Mettre à jour la date de dernier scan de la bibliothèque
         cursor.execute('''
@@ -377,9 +380,19 @@ class LibraryScanner:
 
         return len(series_data)
 
-    def update_series_stats(self, series_id):
-        """Met à jour les statistiques d'une série (total volumes, volumes manquants)"""
-        conn = sqlite3.connect(self.db_path)
+    def update_series_stats(self, series_id, conn=None):
+        """Met à jour les statistiques d'une série (total volumes, volumes manquants)
+        
+        Args:
+            series_id: ID de la série à mettre à jour
+            conn: Connexion SQLite existante (optionnel). Si None, une nouvelle connexion sera créée.
+        """
+        # Si aucune connexion n'est fournie, en créer une nouvelle
+        close_conn = False
+        if conn is None:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            close_conn = True
+        
         cursor = conn.cursor()
 
         # Récupérer tous les numéros de volumes
@@ -398,8 +411,9 @@ class LibraryScanner:
                 SET total_volumes = 0, missing_volumes = '[]', has_parts = 0
                 WHERE id = ?
             ''', (series_id,))
-            conn.commit()
-            conn.close()
+            if close_conn:
+                conn.commit()
+                conn.close()
             return
 
         # Détecter les volumes manquants
@@ -433,8 +447,10 @@ class LibraryScanner:
             series_id
         ))
 
-        conn.commit()
-        conn.close()
+        # Commit et fermeture seulement si on a créé la connexion
+        if close_conn:
+            conn.commit()
+            conn.close()
 
 # Routes Flask
 @app.route('/')
@@ -453,7 +469,7 @@ def import_page():
 @app.route('/api/libraries', methods=['GET', 'POST'])
 def libraries():
     if request.method == 'GET':
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(DATABASE, timeout=30.0)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -491,7 +507,7 @@ def libraries():
             return jsonify({'error': 'Le chemin spécifié n\'existe pas'}), 400
 
         try:
-            conn = sqlite3.connect(DATABASE)
+            conn = sqlite3.connect(DATABASE, timeout=30.0)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -509,7 +525,7 @@ def libraries():
 
 @app.route('/api/libraries/<int:library_id>', methods=['GET', 'DELETE'])
 def library_detail(library_id):
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=30.0)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -533,7 +549,7 @@ def library_detail(library_id):
 @app.route('/api/scan/<int:library_id>')
 def scan_library(library_id):
     try:
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(DATABASE, timeout=30.0)
         cursor = conn.cursor()
 
         cursor.execute('SELECT path FROM libraries WHERE id = ?', (library_id,))
@@ -558,7 +574,7 @@ def scan_library(library_id):
 
 @app.route('/api/library/<int:library_id>/series')
 def library_series(library_id):
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=30.0)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -585,7 +601,7 @@ def library_series(library_id):
 
 @app.route('/api/library/<int:library_id>/stats')
 def library_stats(library_id):
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=30.0)
     cursor = conn.cursor()
 
     # Total séries
@@ -628,59 +644,9 @@ def library_stats(library_id):
         'avg_pages': avg_pages
     })
 
-@app.route('/api/series/<int:series_id>')
-def series_details(series_id):
-    """Récupère les détails complets d'une série avec ses volumes organisés par parties"""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    # Récupérer les infos de la série
-    cursor.execute('SELECT * FROM series WHERE id = ?', (series_id,))
-    series_row = cursor.fetchone()
-    
-    if not series_row:
-        conn.close()
-        return jsonify({'error': 'Série non trouvée'}), 404
-    
-    series = dict(series_row)
-    series['missing_volumes'] = json.loads(series['missing_volumes']) if series['missing_volumes'] else []
-    
-    # Récupérer tous les volumes
-    cursor.execute('''
-        SELECT *
-        FROM volumes
-        WHERE series_id = ?
-        ORDER BY part_number, volume_number
-    ''', (series_id,))
-    
-    volumes = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    
-    # Organiser les volumes par parties si la série a des parties
-    if series['has_parts']:
-        parts = {}
-        for volume in volumes:
-            part_num = volume['part_number']
-            if part_num not in parts:
-                part_name = volume['part_name'] or f"Partie {part_num}"
-                parts[part_num] = {
-                    'name': part_name,
-                    'volumes': []
-                }
-            parts[part_num]['volumes'].append(volume)
-        
-        series['parts'] = parts
-        series['volumes'] = []
-    else:
-        series['volumes'] = volumes
-        series['parts'] = {}
-    
-    return jsonify(series)
-
 @app.route('/api/series/<int:series_id>/volumes')
 def series_volumes(series_id):
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=30.0)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -938,7 +904,7 @@ def execute_import():
                 traceback.print_exc()
 
         # Mettre à jour les statistiques des séries concernées
-        conn = sqlite3.connect(DATABASE)
+        conn = sqlite3.connect(DATABASE, timeout=30.0)
         cursor = conn.cursor()
 
         # Récupérer toutes les séries uniques qui ont reçu des fichiers
@@ -950,7 +916,7 @@ def execute_import():
 
         # Mettre à jour chaque série
         for series_id in series_ids:
-            scanner.update_series_stats(series_id)
+            scanner.update_series_stats(series_id, conn)
 
         conn.close()
 

@@ -165,14 +165,19 @@ class LibraryScanner:
                 r'#(\d+)',                        # #4
                 r'-\s*(\d+)(?:\s|$)',             # - 08 (à la fin ou suivi d'espace)
                 r'\s(\d+)\s*(?:FR|EN|VF|VO)',    # 09 FR (nombre avant langue)
-                r'\s(\d+)$'                       # 08 (juste un nombre à la fin)
+                r'\s(\d{1,3})$'                   # 08 (nombre de 1-3 chiffres à la fin, évite les années)
             ]
 
             for pattern in volume_patterns:
                 match = re.search(pattern, normalized_name, re.IGNORECASE)
                 if match:
-                    info['volume'] = int(match.group(1))
-                    break
+                    potential_volume = int(match.group(1))
+                    # Filtrer les fausses détections :
+                    # - Années (entre 1800-2099)
+                    # - Nombres trop grands pour être des volumes (> 999)
+                    if not (1800 <= potential_volume <= 2099 or potential_volume > 999):
+                        info['volume'] = potential_volume
+                        break
 
         # Extraire le titre (avant Part/Arc ou avant le numéro de tome)
         if info['part_number']:
@@ -351,105 +356,125 @@ class LibraryScanner:
             volumes = data['volumes']
             series_path = data['path']
 
-            # Vérifier si la série existe déjà
-            cursor.execute('''
-                SELECT id FROM series
-                WHERE library_id = ? AND title = ?
-            ''', (library_id, series_title))
-
-            result = cursor.fetchone()
-
-            if result:
-                # Mettre à jour la série existante
-                series_id = result[0]
-                
-                # Mettre à jour le path de la série
-                if series_path:
-                    cursor.execute('UPDATE series SET path = ? WHERE id = ?', (series_path, series_id))
-
-                # Supprimer les anciens volumes pour cette série
-                cursor.execute('DELETE FROM volumes WHERE series_id = ?', (series_id,))
-            else:
-                # Créer une nouvelle série
-                if not series_path:
-                    series_path = os.path.join(library_path, series_title)
-                
+            try:
+                # Vérifier si la série existe déjà
                 cursor.execute('''
-                    INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
-                    VALUES (?, ?, ?, 0, '[]', 0)
-                ''', (library_id, series_title, series_path))
+                    SELECT id FROM series
+                    WHERE library_id = ? AND title = ?
+                ''', (library_id, series_title))
 
-                series_id = cursor.lastrowid
+                result = cursor.fetchone()
 
-            # Ajouter tous les volumes
-            for volume in volumes:
-                parsed = volume['parsed']
-                page_count = self.get_page_count(volume['filepath'], parsed['format'])
+                if result:
+                    # Mettre à jour la série existante
+                    series_id = result[0]
+                    
+                    # Mettre à jour le path de la série
+                    if series_path:
+                        cursor.execute('UPDATE series SET path = ? WHERE id = ?', (series_path, series_id))
 
+                    # Supprimer les anciens volumes pour cette série
+                    cursor.execute('DELETE FROM volumes WHERE series_id = ?', (series_id,))
+                else:
+                    # Créer une nouvelle série
+                    if not series_path:
+                        series_path = os.path.join(library_path, series_title)
+                    
+                    cursor.execute('''
+                        INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
+                        VALUES (?, ?, ?, 0, '[]', 0)
+                    ''', (library_id, series_title, series_path))
+
+                    series_id = cursor.lastrowid
+
+                # Ajouter tous les volumes
+                for volume in volumes:
+                    try:
+                        parsed = volume['parsed']
+                        page_count = self.get_page_count(volume['filepath'], parsed['format'])
+
+                        cursor.execute('''
+                            INSERT INTO volumes
+                            (series_id, part_number, part_name, volume_number, filename, filepath,
+                             author, year, resolution, file_size, page_count, format)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            series_id,
+                            parsed['part_number'],
+                            parsed['part_name'],
+                            parsed['volume'],
+                            volume['filename'],
+                            volume['filepath'],
+                            parsed['author'],
+                            parsed['year'],
+                            parsed['resolution'],
+                            volume['file_size'],
+                            page_count,
+                            parsed['format']
+                        ))
+                    except Exception as vol_error:
+                        # Log l'erreur mais continue avec les autres volumes
+                        print(f"    ⚠️  Erreur sur volume {volume.get('filename', '?')}: {vol_error}")
+                        continue
+
+                # Calculer les statistiques de la série
                 cursor.execute('''
-                    INSERT INTO volumes
-                    (series_id, part_number, part_name, volume_number, filename, filepath,
-                     author, year, resolution, file_size, page_count, format)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    series_id,
-                    parsed['part_number'],
-                    parsed['part_name'],
-                    parsed['volume'],
-                    volume['filename'],
-                    volume['filepath'],
-                    parsed['author'],
-                    parsed['year'],
-                    parsed['resolution'],
-                    volume['file_size'],
-                    page_count,
-                    parsed['format']
-                ))
+                    SELECT COUNT(*), MAX(volume_number)
+                    FROM volumes
+                    WHERE series_id = ?
+                ''', (series_id,))
 
-            # Calculer les statistiques de la série
-            cursor.execute('''
-                SELECT COUNT(*), MAX(volume_number)
-                FROM volumes
-                WHERE series_id = ?
-            ''', (series_id,))
+                total_volumes, max_volume = cursor.fetchone()
 
-            total_volumes, max_volume = cursor.fetchone()
+                # Détecter s'il y a des parties
+                cursor.execute('''
+                    SELECT COUNT(DISTINCT part_number)
+                    FROM volumes
+                    WHERE series_id = ? AND part_number IS NOT NULL
+                ''', (series_id,))
 
-            # Détecter s'il y a des parties
-            cursor.execute('''
-                SELECT COUNT(DISTINCT part_number)
-                FROM volumes
-                WHERE series_id = ? AND part_number IS NOT NULL
-            ''', (series_id,))
+                has_parts = cursor.fetchone()[0] > 0
 
-            has_parts = cursor.fetchone()[0] > 0
+                # Calculer les volumes manquants
+                cursor.execute('''
+                    SELECT volume_number FROM volumes
+                    WHERE series_id = ? AND volume_number IS NOT NULL
+                    ORDER BY volume_number
+                ''', (series_id,))
 
-            # Calculer les volumes manquants
-            cursor.execute('''
-                SELECT volume_number FROM volumes
-                WHERE series_id = ? AND volume_number IS NOT NULL
-                ORDER BY volume_number
-            ''', (series_id,))
+                existing_volumes = [row[0] for row in cursor.fetchall()]
+                missing_volumes = []
 
-            existing_volumes = [row[0] for row in cursor.fetchall()]
-            missing_volumes = []
+                if max_volume and existing_volumes:
+                    for i in range(1, max_volume + 1):
+                        if i not in existing_volumes:
+                            missing_volumes.append(i)
 
-            if max_volume and existing_volumes:
-                for i in range(1, max_volume + 1):
-                    if i not in existing_volumes:
-                        missing_volumes.append(i)
+                # Mettre à jour la série
+                cursor.execute('''
+                    UPDATE series
+                    SET total_volumes = ?,
+                        missing_volumes = ?,
+                        has_parts = ?,
+                        last_scanned = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (total_volumes, json.dumps(missing_volumes), 1 if has_parts else 0, series_id))
 
-            # Mettre à jour la série
-            cursor.execute('''
-                UPDATE series
-                SET total_volumes = ?,
-                    missing_volumes = ?,
-                    has_parts = ?,
-                    last_scanned = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (total_volumes, json.dumps(missing_volumes), 1 if has_parts else 0, series_id))
-
-            print(f"  ✓ {series_title}: {total_volumes} volumes")
+                # Affichage sécurisé avec gestion des caractères spéciaux
+                try:
+                    print(f"  ✓ {series_title}: {total_volumes} volumes")
+                except UnicodeEncodeError:
+                    # Si le print échoue à cause de l'encodage, essayer en ASCII
+                    safe_title = series_title.encode('ascii', 'ignore').decode('ascii')
+                    print(f"  ✓ {safe_title}: {total_volumes} volumes")
+                
+            except Exception as series_error:
+                # Log l'erreur mais continue avec les autres séries
+                try:
+                    print(f"  ⚠️  Erreur sur série '{series_title}': {series_error}")
+                except UnicodeEncodeError:
+                    print(f"  ⚠️  Erreur sur une série: {series_error}")
+                continue
 
         # Mettre à jour la date de scan de la bibliothèque
         cursor.execute('''
@@ -462,6 +487,80 @@ class LibraryScanner:
         conn.close()
 
         return len(series_data)
+        
+        
+    def update_series_stats(self, series_id, conn=None):
+        """Met à jour les statistiques d'une série (total volumes, volumes manquants)
+        
+        Args:
+            series_id: ID de la série à mettre à jour
+            conn: Connexion SQLite existante (optionnel). Si None, une nouvelle connexion sera créée.
+        """
+        # Si aucune connexion n'est fournie, en créer une nouvelle
+        close_conn = False
+        if conn is None:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            close_conn = True
+        
+        cursor = conn.cursor()
+
+        # Récupérer tous les numéros de volumes
+        cursor.execute('''
+            SELECT DISTINCT volume_number
+            FROM volumes
+            WHERE series_id = ? AND volume_number IS NOT NULL
+            ORDER BY volume_number
+        ''', (series_id,))
+
+        volume_numbers = [row[0] for row in cursor.fetchall()]
+
+        if not volume_numbers:
+            cursor.execute('''
+                UPDATE series
+                SET total_volumes = 0, missing_volumes = '[]', has_parts = 0
+                WHERE id = ?
+            ''', (series_id,))
+            if close_conn:
+                conn.commit()
+                conn.close()
+            return
+
+        # Détecter les volumes manquants
+        min_vol = min(volume_numbers)
+        max_vol = max(volume_numbers)
+        expected_volumes = set(range(min_vol, max_vol + 1))
+        actual_volumes = set(volume_numbers)
+        missing_volumes = sorted(expected_volumes - actual_volumes)
+
+        # Vérifier si la série a des parties
+        cursor.execute('''
+            SELECT COUNT(DISTINCT part_number)
+            FROM volumes
+            WHERE series_id = ? AND part_number IS NOT NULL
+        ''', (series_id,))
+
+        has_parts = cursor.fetchone()[0] > 1
+
+        # Mettre à jour
+        cursor.execute('''
+            UPDATE series
+            SET total_volumes = ?,
+                missing_volumes = ?,
+                has_parts = ?,
+                last_scanned = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (
+            len(volume_numbers),
+            json.dumps(missing_volumes),
+            1 if has_parts else 0,
+            series_id
+        ))
+
+        # Commit et fermeture seulement si on a créé la connexion
+        if close_conn:
+            conn.commit()
+            conn.close()
+
 
     def get_library_stats(self, library_id):
         """Récupère les statistiques d'une bibliothèque"""
@@ -514,6 +613,7 @@ def save_emule_config():
 
 # Charger la config au démarrage
 load_emule_config()
+
 
 # ROUTES WEB
 @app.route('/')
@@ -895,6 +995,433 @@ def search_ed2k():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/import/scan', methods=['POST'])
+def scan_import_directory():
+    """Scanne un répertoire pour trouver les fichiers à importer"""
+    data = request.json
+    import_path = data.get('path', '')
+
+    if not import_path or not os.path.exists(import_path):
+        return jsonify({'error': 'Chemin invalide ou inexistant'}), 400
+
+    try:
+        scanner = LibraryScanner()
+        supported_extensions = {'.cbz', '.cbr', '.zip', '.rar', '.pdf', '.epub'}
+
+        files_found = []
+
+        # Parcourir le répertoire
+        for root, dirs, files in os.walk(import_path):
+            # Ignorer les répertoires spéciaux
+            dirs[:] = [d for d in dirs if d not in ['_old_files', '_doublons']]
+            
+            for filename in files:
+                ext = os.path.splitext(filename)[1].lower()
+
+                if ext in supported_extensions:
+                    filepath = os.path.join(root, filename)
+                    parsed = scanner.parse_filename(filename)
+
+                    files_found.append({
+                        'filename': filename,
+                        'filepath': filepath,
+                        'relative_path': os.path.relpath(filepath, import_path),
+                        'file_size': os.path.getsize(filepath),
+                        'parsed': parsed
+                    })
+
+        return jsonify({
+            'success': True,
+            'files': files_found,
+            'count': len(files_found)
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/import/execute', methods=['POST'])
+def execute_import():
+    """Exécute l'import des fichiers vers leurs destinations"""
+    data = request.json
+    files_to_import = data.get('files', [])
+    import_base_path = data.get('import_path', '')
+
+    if not files_to_import:
+        return jsonify({'error': 'Aucun fichier à importer'}), 400
+
+    try:
+        scanner = LibraryScanner()
+        imported_count = 0
+        replaced_count = 0
+        skipped_count = 0
+        failed_count = 0
+        failures = []
+
+        # Créer les répertoires spéciaux à la racine du répertoire d'import
+        if import_base_path:
+            old_files_dir = os.path.join(import_base_path, '_old_files')
+            doublons_dir = os.path.join(import_base_path, '_doublons')
+            os.makedirs(old_files_dir, exist_ok=True)
+            os.makedirs(doublons_dir, exist_ok=True)
+
+        # Traiter chaque fichier
+        for file_data in files_to_import:
+            try:
+                source_path = file_data['filepath']
+                destination = file_data.get('destination')
+                source_size = file_data.get('file_size', 0)
+
+                if not destination:
+                    failed_count += 1
+                    failures.append({
+                        'file': file_data['filename'],
+                        'error': 'Pas de destination définie'
+                    })
+                    continue
+
+                # Récupérer ou créer la série
+                conn = sqlite3.connect(DATABASE, timeout=30)
+                #conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                if destination.get('is_new_series'):
+                    # Créer une nouvelle série
+                    series_title = destination['series_title']
+                    library_id = destination['library_id']
+                    library_path = destination['library_path']
+
+                    # ===== CORRECTION DU BUG =====
+                    # Créer le dossier de la série DANS le dossier de la bibliothèque
+                    series_path = os.path.join(library_path, series_title)
+                    os.makedirs(series_path, exist_ok=True)
+                    # =============================
+
+                    # Insérer la série dans la base
+                    cursor.execute('''
+                        INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
+                        VALUES (?, ?, ?, 0, '[]', 0)
+                    ''', (library_id, series_title, series_path))
+
+                    series_id = cursor.lastrowid
+                    target_dir = series_path
+                else:
+                    # Utiliser une série existante
+                    series_id = destination['series_id']
+                    library_path = destination['library_path']
+                    series_title = destination['series_title']
+
+                    # ===== CORRECTION DU BUG =====
+                    # TOUJOURS construire le chemin correct basé sur bibliothèque + nom série
+                    # Ne PAS faire confiance au path en base de données qui peut être incorrect
+                    target_dir = os.path.join(library_path, series_title)
+                    
+                    # Créer le dossier s'il n'existe pas
+                    os.makedirs(target_dir, exist_ok=True)
+                    
+                    # Mettre à jour le chemin de la série dans la base de données
+                    cursor.execute('UPDATE series SET path = ? WHERE id = ?', (target_dir, series_id))
+                    # =============================
+
+                # Construire le chemin de destination
+                target_path = os.path.join(target_dir, file_data['filename'])
+
+                # NOUVELLE LOGIQUE : Vérifier si un fichier existe déjà avec le même numéro de volume
+                import shutil
+                volume_number = file_data['parsed'].get('volume')
+                existing_file_path = None
+                existing_file_size = 0
+
+                if volume_number:
+                    # Chercher un fichier existant pour ce volume dans la base de données
+                    cursor.execute('''
+                        SELECT filepath, file_size FROM volumes
+                        WHERE series_id = ? AND volume_number = ?
+                        ORDER BY id DESC LIMIT 1
+                    ''', (series_id, volume_number))
+
+                    existing_volume = cursor.fetchone()
+                    if existing_volume:
+                        existing_file_path = existing_volume[0]
+                        existing_file_size = existing_volume[1]
+
+                action_taken = None
+
+                # Si un fichier existe déjà pour ce volume
+                if existing_file_path and os.path.exists(existing_file_path):
+                    # Comparer les tailles
+                    if source_size > existing_file_size:
+                        # Le nouveau fichier est plus gros : remplacer
+                        print(f"Remplacement: {file_data['filename']} ({source_size} bytes) > ancien ({existing_file_size} bytes)")
+
+                        # Déplacer l'ancien fichier vers _old_files
+                        old_filename = os.path.basename(existing_file_path)
+                        old_dest_path = os.path.join(old_files_dir, old_filename)
+
+                        # Si le fichier existe déjà dans _old_files, ajouter un timestamp
+                        if os.path.exists(old_dest_path):
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            base, ext = os.path.splitext(old_filename)
+                            old_dest_path = os.path.join(old_files_dir, f"{base}_{timestamp}{ext}")
+
+                        shutil.move(existing_file_path, old_dest_path)
+
+                        # Supprimer l'ancien volume de la base de données
+                        cursor.execute('DELETE FROM volumes WHERE filepath = ?', (existing_file_path,))
+
+                        # Déplacer le nouveau fichier
+                        shutil.move(source_path, target_path)
+                        action_taken = 'replaced'
+                        replaced_count += 1
+
+                    else:
+                        # Le nouveau fichier est plus petit ou égal : ne pas importer
+                        print(f"Doublon ignoré: {file_data['filename']} ({source_size} bytes) <= existant ({existing_file_size} bytes)")
+
+                        # Déplacer vers _doublons
+                        doublon_path = os.path.join(doublons_dir, file_data['filename'])
+
+                        # Si le fichier existe déjà dans _doublons, ajouter un timestamp
+                        if os.path.exists(doublon_path):
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            base, ext = os.path.splitext(file_data['filename'])
+                            doublon_path = os.path.join(doublons_dir, f"{base}_{timestamp}{ext}")
+
+                        shutil.move(source_path, doublon_path)
+                        action_taken = 'skipped_duplicate'
+                        skipped_count += 1
+                        conn.close()
+                        continue
+                else:
+                    # Pas de fichier existant : import normal
+                    # Si le fichier de destination existe déjà (même nom de fichier)
+                    if os.path.exists(target_path):
+                        base, ext = os.path.splitext(file_data['filename'])
+                        counter = 1
+                        while os.path.exists(target_path):
+                            target_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
+                            counter += 1
+
+                    # Déplacer le fichier
+                    shutil.move(source_path, target_path)
+                    action_taken = 'imported'
+                    imported_count += 1
+
+                # Ajouter le volume à la base de données (sauf si skipped)
+                if action_taken != 'skipped_duplicate':
+                    parsed = file_data['parsed']
+                    page_count = scanner.get_page_count(target_path, parsed['format'])
+
+                    cursor.execute('''
+                        INSERT INTO volumes
+                        (series_id, part_number, part_name, volume_number, filename, filepath,
+                         author, year, resolution, file_size, page_count, format)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        series_id, parsed['part_number'], parsed['part_name'], parsed['volume'],
+                        os.path.basename(target_path), target_path, parsed['author'], parsed['year'],
+                        parsed['resolution'], source_size, page_count, parsed['format']
+                    ))
+
+                conn.commit()
+                conn.close()
+
+            except Exception as e:
+                failed_count += 1
+                failures.append({
+                    'file': file_data['filename'],
+                    'error': str(e)
+                })
+                print(f"Erreur import {file_data['filename']}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Mettre à jour les statistiques des séries concernées
+        conn = sqlite3.connect(DATABASE, timeout=30.0)
+        cursor = conn.cursor()
+
+        # Récupérer toutes les séries uniques qui ont reçu des fichiers
+        series_ids = set()
+        for file_data in files_to_import:
+            dest = file_data.get('destination')
+            if dest and dest.get('series_id'):
+                series_ids.add(dest['series_id'])
+
+        # Mettre à jour chaque série
+        for series_id in series_ids:
+            scanner.update_series_stats(series_id, conn)
+
+        conn.close()
+
+        # Nettoyer les répertoires vides dans le répertoire d'import
+        if import_base_path:
+            cleaned_dirs = cleanup_empty_directories(import_base_path)
+        else:
+            cleaned_dirs = 0
+
+        return jsonify({
+            'success': True,
+            'imported_count': imported_count,
+            'replaced_count': replaced_count,
+            'skipped_count': skipped_count,
+            'failed_count': failed_count,
+            'failures': failures,
+            'cleaned_directories': cleaned_dirs
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+def cleanup_empty_directories(base_path):
+    """
+    Nettoie les répertoires vides dans le chemin d'import
+    Ignore _old_files et _doublons
+    Retourne le nombre de répertoires supprimés
+    """
+    if not os.path.exists(base_path):
+        return 0
+
+    deleted_count = 0
+    protected_dirs = ['_old_files', '_doublons']
+
+    # Parcourir en ordre inverse (du plus profond au plus superficiel)
+    # pour supprimer les sous-répertoires vides avant les parents
+    for root, dirs, files in os.walk(base_path, topdown=False):
+        # Ignorer les répertoires protégés et leurs sous-répertoires
+        relative_path = os.path.relpath(root, base_path)
+        path_parts = relative_path.split(os.sep)
+
+        # Ne pas toucher aux répertoires protégés
+        if any(protected in path_parts for protected in protected_dirs):
+            continue
+
+        # Ne pas supprimer le répertoire de base lui-même
+        if root == base_path:
+            continue
+
+        # Vérifier si le répertoire est vide (pas de fichiers, pas de sous-répertoires)
+        try:
+            if not os.listdir(root):  # Répertoire complètement vide
+                print(f"Suppression du répertoire vide: {root}")
+                os.rmdir(root)
+                deleted_count += 1
+        except (OSError, PermissionError) as e:
+            print(f"Impossible de supprimer {root}: {e}")
+
+    return deleted_count
+
+@app.route('/api/import/cleanup', methods=['POST'])
+def cleanup_import_directory():
+    """Nettoie les répertoires vides du répertoire d'import"""
+    data = request.json
+    import_path = data.get('path', '')
+
+    if not import_path or not os.path.exists(import_path):
+        return jsonify({'error': 'Chemin invalide ou inexistant'}), 400
+
+    try:
+        cleaned_count = cleanup_empty_directories(import_path)
+
+        return jsonify({
+            'success': True,
+            'cleaned_directories': cleaned_count
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+def get_or_create_key():
+    """Génère ou récupère la clé de chiffrement"""
+    try:
+        from cryptography.fernet import Fernet
+        import os
+
+        if os.path.exists(KEY_FILE):
+            with open(KEY_FILE, 'rb') as f:
+                return f.read()
+        else:
+            key = Fernet.generate_key()
+            with open(KEY_FILE, 'wb') as f:
+                f.write(key)
+            print(f"✓ Clé de chiffrement générée dans {KEY_FILE}")
+            return key
+    except ImportError:
+        print("⚠️ Module cryptography non installé. Mot de passe non chiffré.")
+        return None
+
+def encrypt_password(password):
+    """Chiffre le mot de passe"""
+    if not password:
+        return ''
+    try:
+        from cryptography.fernet import Fernet
+        key = get_or_create_key()
+        if key:
+            f = Fernet(key)
+            return f.encrypt(password.encode()).decode()
+        return password
+    except:
+        return password
+
+def decrypt_password(encrypted_password):
+    """Déchiffre le mot de passe"""
+    if not encrypted_password:
+        return ''
+    try:
+        from cryptography.fernet import Fernet
+        key = get_or_create_key()
+        if key:
+            f = Fernet(key)
+            return f.decrypt(encrypted_password.encode()).decode()
+        return encrypted_password
+    except:
+        return encrypted_password
+
+def load_emule_config():
+    """Charge la configuration depuis le fichier JSON"""
+    global EMULE_CONFIG
+    try:
+        import json
+        import os
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                saved_config = json.load(f)
+                # Déchiffre le mot de passe
+                if 'password' in saved_config:
+                    saved_config['password'] = decrypt_password(saved_config['password'])
+                EMULE_CONFIG.update(saved_config)
+                print(f"✓ Configuration aMule chargée depuis {CONFIG_FILE}")
+    except Exception as e:
+        print(f"⚠️ Impossible de charger la config: {e}")
+
+def save_emule_config():
+    """Sauvegarde la configuration dans le fichier JSON"""
+    try:
+        import json
+        # Copie de la config avec mot de passe chiffré
+        config_to_save = EMULE_CONFIG.copy()
+        config_to_save['password'] = encrypt_password(EMULE_CONFIG['password'])
+
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config_to_save, f, indent=4)
+        print(f"✓ Configuration aMule sauvegardée dans {CONFIG_FILE} (mot de passe chiffré)")
+        return True
+    except Exception as e:
+        print(f"✗ Erreur lors de la sauvegarde: {e}")
+        return False
+
+# Charge la config au démarrage
+load_emule_config()
+
 
 @app.route('/covers/<path:filename>')
 def serve_cover(filename):

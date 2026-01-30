@@ -628,6 +628,56 @@ def library_stats(library_id):
         'avg_pages': avg_pages
     })
 
+@app.route('/api/series/<int:series_id>')
+def series_details(series_id):
+    """Récupère les détails complets d'une série avec ses volumes organisés par parties"""
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Récupérer les infos de la série
+    cursor.execute('SELECT * FROM series WHERE id = ?', (series_id,))
+    series_row = cursor.fetchone()
+    
+    if not series_row:
+        conn.close()
+        return jsonify({'error': 'Série non trouvée'}), 404
+    
+    series = dict(series_row)
+    series['missing_volumes'] = json.loads(series['missing_volumes']) if series['missing_volumes'] else []
+    
+    # Récupérer tous les volumes
+    cursor.execute('''
+        SELECT *
+        FROM volumes
+        WHERE series_id = ?
+        ORDER BY part_number, volume_number
+    ''', (series_id,))
+    
+    volumes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    # Organiser les volumes par parties si la série a des parties
+    if series['has_parts']:
+        parts = {}
+        for volume in volumes:
+            part_num = volume['part_number']
+            if part_num not in parts:
+                part_name = volume['part_name'] or f"Partie {part_num}"
+                parts[part_num] = {
+                    'name': part_name,
+                    'volumes': []
+                }
+            parts[part_num]['volumes'].append(volume)
+        
+        series['parts'] = parts
+        series['volumes'] = []
+    else:
+        series['volumes'] = volumes
+        series['parts'] = {}
+    
+    return jsonify(series)
+
 @app.route('/api/series/<int:series_id>/volumes')
 def series_volumes(series_id):
     conn = sqlite3.connect(DATABASE)

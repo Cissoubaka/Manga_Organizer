@@ -741,7 +741,8 @@ def execute_import():
                     continue
 
                 # Récupérer ou créer la série
-                conn = sqlite3.connect(DATABASE)
+                conn = sqlite3.connect(DATABASE, timeout=30)
+                #conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
                 if destination.get('is_new_series'):

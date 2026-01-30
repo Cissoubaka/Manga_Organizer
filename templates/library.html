@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bibliothèque Manga</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-library-search.css') }}">
 </head>
 <body>
     <div class="container">
@@ -65,10 +66,19 @@
         </div>
     </div>
 
+    <!-- Modal de recherche ED2K -->
+    <div class="modal" id="search-ed2k-modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-modal" onclick="closeSearchModal()">×</span>
+            <div id="search-modal-body"></div>
+        </div>
+    </div>
+
     <script>
         const libraryId = {{ library_id }};
         let seriesData = [];
         let showOnlyMissing = false;
+        let currentSeriesTitle = '';
 
         async function loadLibraryInfo() {
             try {
@@ -198,6 +208,9 @@
                 const data = await response.json();
                 
                 console.log('Données reçues:', data);
+                
+                // Sauvegarder le titre de la série pour la recherche
+                currentSeriesTitle = data.title;
 
                 let volumesHtml = '';
                 
@@ -268,9 +281,10 @@
                                 <h3 class="missing-volumes-title">⚠️ Volumes manquants</h3>
                                 <div class="missing-volumes-grid">
                                     ${data.missing_volumes.map(volNum => `
-                                        <div class="missing-volume-card">
+                                        <div class="missing-volume-card" onclick="searchMissingVolume('${escapeHtml(data.title)}', ${volNum}); event.stopPropagation();" style="cursor: pointer;">
                                             <div class="missing-volume-number">${volNum}</div>
                                             <div class="missing-volume-label">Vol. ${volNum}</div>
+                                            <div style="font-size: 0.7em; color: #667eea; margin-top: 5px;">🔍 Rechercher</div>
                                         </div>
                                     `).join('')}
                                 </div>
@@ -287,16 +301,226 @@
             }
         }
 
+        async function searchMissingVolume(seriesTitle, volumeNumber) {
+            const searchModal = document.getElementById('search-ed2k-modal');
+            const searchModalBody = document.getElementById('search-modal-body');
+            
+            searchModal.classList.add('active');
+            searchModalBody.innerHTML = '<div class="loading"><div class="spinner"></div><p>Recherche en cours...</p></div>';
+
+            try {
+                const params = new URLSearchParams();
+                params.append('query', seriesTitle);
+                params.append('volume', volumeNumber);
+
+                const response = await fetch(`/api/search?${params}`);
+                const data = await response.json();
+
+                if (data.results && data.results.length > 0) {
+                    displaySearchResults(seriesTitle, volumeNumber, data.results);
+                } else {
+                    searchModalBody.innerHTML = `
+                        <div class="search-header">
+                            <h2>🔍 Recherche: ${escapeHtml(seriesTitle)} - Volume ${volumeNumber}</h2>
+                        </div>
+                        <div class="no-data">
+                            <h3>😕 Aucun résultat</h3>
+                            <p>Aucun lien ED2K trouvé pour ce volume dans la base de données</p>
+                            <button class="btn" onclick="closeSearchModal()" style="margin-top: 20px;">Fermer</button>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                searchModalBody.innerHTML = `
+                    <div class="no-data">
+                        <h3>❌ Erreur</h3>
+                        <p>${error.message}</p>
+                        <button class="btn" onclick="closeSearchModal()" style="margin-top: 20px;">Fermer</button>
+                    </div>
+                `;
+            }
+        }
+
+        function displaySearchResults(seriesTitle, volumeNumber, results) {
+            const searchModalBody = document.getElementById('search-modal-body');
+            
+            // Regrouper par thread
+            const grouped = {};
+            results.forEach(result => {
+                if (!grouped[result.thread_id]) {
+                    grouped[result.thread_id] = {
+                        title: result.thread_title,
+                        url: result.thread_url,
+                        category: result.forum_category,
+                        cover_image: result.cover_image,
+                        description: result.description,
+                        links: []
+                    };
+                }
+                grouped[result.thread_id].links.push(result);
+            });
+
+            let html = `
+                <div class="search-header">
+                    <h2>🔍 ${escapeHtml(seriesTitle)} - Volume ${volumeNumber}</h2>
+                    <p style="color: #666; margin-top: 10px;">${results.length} résultat(s) trouvé(s)</p>
+                </div>
+            `;
+
+            for (const threadId in grouped) {
+                const thread = grouped[threadId];
+                
+                html += `
+                    <div class="result-card" style="margin-top: 20px;">
+                        <div class="cover-container">
+                            ${thread.cover_image ? 
+                                `<img src="/covers/${thread.cover_image.replace('covers/', '')}" class="cover-image" alt="Couverture">` 
+                                : '<div class="cover-image" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #999;">Pas de couverture</div>'
+                            }
+                        </div>
+                        <div class="result-content">
+                            <div class="result-title">${thread.title}</div>
+                            <span class="result-category">${thread.category || 'Non catégorisé'}</span>
+                            
+                            ${thread.description ? 
+                                `<div class="description">${thread.description}</div>` 
+                                : ''
+                            }
+                            
+                            <div class="file-info">
+                `;
+
+                thread.links.forEach((link, index) => {
+                    const volumeDisplay = link.volume ? `<div class="volume-badge">Vol. ${link.volume}</div>` : '';
+                    const decodedFilename = decodeFilename(link.filename);
+                    
+                    html += `
+                        <div class="file-item">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                ${volumeDisplay}
+                                <div class="file-name" title="${decodedFilename}">${decodedFilename}</div>
+                            </div>
+                            <div class="file-size">${formatBytes(link.filesize)}</div>
+                            <button class="copy-button" onclick="copyLink('${escapeForAttribute(link.link)}', this)">📋 Copier</button>
+                            <button class="add-button" onclick="addToEmule('${escapeForAttribute(link.link)}', this)" id="add-search-${threadId}-${index}">
+                                ⬇️ Ajouter
+                            </button>
+                        </div>
+                    `;
+                });
+
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div style="text-align: center; margin-top: 30px;">
+                    <button class="btn" onclick="closeSearchModal()">Fermer</button>
+                </div>
+            `;
+
+            searchModalBody.innerHTML = html;
+            
+            // Vérifier si aMule est activé pour afficher/cacher les boutons
+            checkEmuleStatus();
+        }
+
+        function decodeFilename(filename) {
+            try {
+                return decodeURIComponent(filename);
+            } catch (e) {
+                return filename;
+            }
+        }
+
+        function escapeForAttribute(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        async function copyLink(link, button) {
+            try {
+                await navigator.clipboard.writeText(link);
+                button.textContent = '✓ Copié!';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = '📋 Copier';
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (error) {
+                alert('Erreur lors de la copie: ' + error);
+            }
+        }
+
+        async function addToEmule(link, button) {
+            const originalText = button.textContent;
+            button.textContent = '⏳ Envoi...';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('/api/emule/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({link: link})
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    button.textContent = '✓ Ajouté!';
+                    button.style.background = '#28a745';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                        button.style.background = '';
+                    }, 3000);
+                } else {
+                    throw new Error(data.error || 'Erreur inconnue');
+                }
+            } catch (error) {
+                button.textContent = '✗ Erreur';
+                button.style.background = '#dc3545';
+                alert('Erreur: ' + error.message);
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                    button.style.background = '';
+                }, 3000);
+            }
+        }
+
+        async function checkEmuleStatus() {
+            try {
+                const response = await fetch('/api/emule/config');
+                const config = await response.json();
+                
+                const addButtons = document.querySelectorAll('.add-button');
+                addButtons.forEach(button => {
+                    button.style.display = config.enabled ? 'inline-block' : 'none';
+                });
+            } catch (error) {
+                console.error('Erreur lors de la vérification du statut aMule:', error);
+            }
+        }
+
         function closeModal() {
             document.getElementById('series-modal').classList.remove('active');
         }
 
+        function closeSearchModal() {
+            document.getElementById('search-ed2k-modal').classList.remove('active');
+        }
+
         function formatBytes(bytes) {
-            if (bytes === 0) return '0 B';
+            if (!bytes) return 'N/A';
+            const b = parseInt(bytes);
+            if (b === 0) return '0 B';
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            const i = Math.floor(Math.log(b) / Math.log(k));
+            return Math.round(b / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
         function escapeHtml(text) {
@@ -312,8 +536,12 @@
 
         window.onclick = function(event) {
             const modal = document.getElementById('series-modal');
+            const searchModal = document.getElementById('search-ed2k-modal');
             if (event.target == modal) {
                 closeModal();
+            }
+            if (event.target == searchModal) {
+                closeSearchModal();
             }
         }
 

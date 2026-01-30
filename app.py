@@ -22,7 +22,7 @@ def static_files(filename):
 
 # Configuration
 DATABASE = './data/manga_library.db'
-DB_FILE = "./data/edbz.db"
+DB_FILE = "./data/ebdz.db"
 CONFIG_FILE = "./data/emule_config.json"
 KEY_FILE = "./data/.emule_key"
 
@@ -367,6 +367,11 @@ def view_library(library_id):
 def import_view():
     """Page d'import de mangas"""
     return render_template('import.html')
+
+@app.route('/settings')
+def settings():
+    """Page de configuration de l'application"""
+    return render_template('settings.html')
 
 # API - Gestion des bibliothèques
 

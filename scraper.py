@@ -85,22 +85,35 @@ class MyBBScraper:
         if not filename:
             return None
         
-        # Patterns pour détecter les numéros de volume
+        # Patterns pour détecter les numéros de volume (ordonnés du plus spécifique au plus général)
         patterns = [
-            r'[Tt](\d{1,3})',           # T01, t12, T123
-            r'[Vv]ol\.?\s*(\d{1,3})',   # Vol.01, vol 12, Vol.123
-            r'[Vv](\d{1,3})',           # V01, v12
-            r'Volume\s*(\d{1,3})',      # Volume 01
-            r'Tome\s*(\d{1,3})',        # Tome 01
-            r'\s-\s(\d{1,3})\s',        # - 01 -
-            r'#(\d{1,3})',              # #01
+            # Patterns spécifiques avec préfixes clairs
+            r'[Tt]ome[_\s.-]+(\d{1,3})',           # Tome 06, Tome.06, Tome_06
+            r'[Vv]ol(?:ume)?[._\s-]*(\d{1,3})',    # Vol.01, Volume 12, vol_123
+            r'[Tt][._-]?(\d{1,3})',                # T01, T.12, t-123
+            r'[Vv][._-]?(\d{1,3})',                # V01, v.12
+            r'#(\d{1,3})',                         # #01
+            r'(\d{1,3})(?:th|st|nd|rd)[._\s-]battle', # 10th.battle (pour Free Fight)
+            
+            # Patterns avec séparateurs
+            r'[._-](\d{1,3})[._-]',                # .01., -12-, _34_
+            r'_(\d{1,3})\.(?:rar|cbr|cbz|zip)',    # Tough_34.rar
+            
+            # Pattern pour "Nom du manga Numéro" (ex: "Dai 18")
+            # On cherche un nombre de 1-3 chiffres précédé d'un espace et suivi d'un espace, point ou fin de mot
+            r'\s(\d{1,3})(?=\s|\.|\[|\(|$)',       # "Dai 18 ", "Dai 18."
+            
+            # Pattern pour lettres+chiffres collés (ex: tough11, Tough14)
+            r'[a-z](\d{2,3})(?:[._\s-]|\[|\(|\.)', # tough11., Tough14(, arisa01[
         ]
         
         for pattern in patterns:
             match = re.search(pattern, filename, re.IGNORECASE)
             if match:
                 volume = int(match.group(1))
-                return volume
+                # Ignore les nombres qui ressemblent à des années ou des résolutions
+                if volume > 0 and volume < 500:  # Limite raisonnable pour un volume de manga
+                    return volume
         
         return None
     
@@ -128,7 +141,7 @@ class MyBBScraper:
             connection.commit()
             cursor.close()
             connection.close()
-            print("✓ Table créée/vérifiée dans edbz.db (avec colonne volume)")
+            print("✓ Table créée/vérifiée dans ebdz.db")
     
     def extract_ed2k_links(self, html):
         """Extrait les liens ed2k du HTML"""
@@ -386,7 +399,7 @@ class MyBBScraper:
 # Configuration
 if __name__ == "__main__":
     # Fichier de base de données SQLite dans ./data
-    DB_FILE = "./data/edbz.db"
+    DB_FILE = "./data/ebdz.db"
     
     # Créer le répertoire data si nécessaire
     os.makedirs('./data', exist_ok=True)

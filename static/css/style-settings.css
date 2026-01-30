@@ -1,0 +1,380 @@
+/* Styles pour la page de configuration */
+
+.settings-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 0;
+    overflow-x: auto;
+}
+
+.tab-button {
+    padding: 15px 25px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #666;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.tab-button:hover:not(:disabled) {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.tab-button.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}
+
+.tab-button:disabled {
+    cursor: not-allowed;
+    color: #ccc;
+}
+
+.settings-content {
+    min-height: 400px;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-section {
+    max-width: 900px;
+}
+
+.section-header {
+    margin-bottom: 30px;
+}
+
+.section-header h2 {
+    color: #333;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.section-description {
+    color: #666;
+    font-size: 1.05em;
+    line-height: 1.6;
+}
+
+.settings-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s;
+}
+
+.checkbox-group:hover {
+    border-color: #667eea;
+    background: #f0f2ff;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.checkbox-group label {
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.checkbox-group label strong {
+    font-size: 1.1em;
+    color: #333;
+}
+
+.help-text {
+    display: block;
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+    font-weight: normal;
+}
+
+.form-select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.password-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.password-input-group input {
+    flex: 1;
+}
+
+.btn-toggle-password {
+    padding: 12px 20px;
+    background: #f0f0f0;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-toggle-password:hover {
+    background: #e0e0e0;
+    border-color: #ccc;
+}
+
+.message {
+    padding: 15px 20px;
+    margin-top: 20px;
+    border-radius: 8px;
+    display: none;
+    font-weight: 600;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 2px solid #c3e6cb;
+}
+
+.message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 2px solid #f5c6cb;
+}
+
+.message.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 2px solid #ffeaa7;
+}
+
+.message.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 2px solid #bee5eb;
+}
+
+/* Section d'aide */
+.help-section {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 15px;
+    padding: 25px;
+    margin-top: 30px;
+}
+
+.help-section h3 {
+    color: #667eea;
+    margin-bottom: 20px;
+    font-size: 1.4em;
+}
+
+.help-details {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s;
+}
+
+.help-details:hover {
+    border-color: #667eea;
+}
+
+.help-details summary {
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    padding: 5px 0;
+    font-size: 1.05em;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.help-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.help-details summary::before {
+    content: '▶';
+    color: #667eea;
+    transition: transform 0.3s;
+    font-size: 0.8em;
+}
+
+.help-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.help-details summary:hover {
+    color: #667eea;
+}
+
+.help-content {
+    padding-top: 15px;
+    color: #555;
+    line-height: 1.8;
+}
+
+.help-content ol,
+.help-content ul {
+    padding-left: 25px;
+    margin-top: 10px;
+}
+
+.help-content li {
+    margin-bottom: 8px;
+}
+
+.help-content code {
+    background: #f0f0f0;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #d63384;
+}
+
+.help-content strong {
+    color: #667eea;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .settings-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab-button {
+        font-size: 0.95em;
+        padding: 12px 18px;
+    }
+    
+    .settings-card {
+        padding: 20px;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .section-header h2 {
+        font-size: 1.6em;
+    }
+    
+    .password-input-group {
+        flex-direction: column;
+    }
+    
+    .btn-toggle-password {
+        width: 100%;
+    }
+}
+
+/* Animation pour les éléments interactifs */
+.form-group input:focus,
+.form-group select:focus {
+    transform: scale(1.01);
+}
+
+/* Style pour les boutons dans form-actions */
+.form-actions {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.form-actions .btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+@media (max-width: 600px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+}

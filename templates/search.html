@@ -14,12 +14,12 @@
                    <h1>🔍 Recherche ED2K</h1>
             <p class="subtitle">Base de données de liens EmuleBDZ</p>
                 </div>
-                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/settings" class="btn-back" style="background: #6c757d; border-color: #6c757d;">⚙️ Configuration</a>
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                </div>
             </div>
         </header>
-        <div class="header">
-            <div class="settings-icon" onclick="openSettings()">⚙️</div>
-        </div>
 
         <div class="search-box">
             <div class="search-input-group">
@@ -80,39 +80,6 @@
         </div>
 
         <div id="results"></div>
-    </div>
-
-    <!-- Modal des paramètres -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeSettings()">&times;</span>
-            <h2>⚙️ Configuration aMule</h2>
-            
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="emuleEnabled">
-                <label for="emuleEnabled">Activer l'intégration aMule</label>
-            </div>
-
-            <div class="form-group">
-                <label for="emuleHost">Hôte</label>
-                <input type="text" id="emuleHost" value="127.0.0.1">
-            </div>
-
-            <div class="form-group">
-                <label for="emuleEcPort">Port External Connections (EC)</label>
-                <input type="number" id="emuleEcPort" value="4712">
-            </div>
-
-            <div class="form-group">
-                <label for="emulePassword">Mot de passe EC</label>
-                <input type="password" id="emulePassword" placeholder="Mot de passe aMule">
-            </div>
-
-            <button class="save-button" onclick="saveSettings()">Enregistrer</button>
-            <button class="test-button" onclick="testConnection()">Tester la connexion</button>
-            
-            <div id="settingsMessage" class="message"></div>
-        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

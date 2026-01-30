@@ -1,0 +1,261 @@
+/* Styles additionnels pour la recherche ED2K dans library.html */
+
+/* Amélioration du curseur sur les cartes de volumes manquants */
+.missing-volume-card[onclick] {
+    cursor: pointer !important;
+}
+
+.missing-volume-card[onclick]:hover {
+    background: linear-gradient(135deg, #fff9e6, #ffffff);
+    border-color: #667eea;
+}
+
+.missing-volume-card[onclick]:hover .missing-volume-number {
+    color: #667eea;
+}
+
+/* Styles pour l'en-tête de recherche dans la modal */
+.search-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 12px 12px 0 0;
+    margin: -30px -30px 20px -30px;
+}
+
+.search-header h2 {
+    color: white;
+    margin: 0;
+    font-size: 1.8em;
+}
+
+.search-header p {
+    margin-top: 10px;
+    opacity: 0.9;
+}
+
+/* Styles pour les cartes de résultats de recherche */
+.result-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    border: 2px solid #e0e0e0;
+}
+
+.result-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.cover-container {
+    width: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.cover-image {
+    width: 120px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    object-fit: cover;
+}
+
+.result-content {
+    flex: 1;
+}
+
+.result-title {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.result-category {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.description {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-size: 0.95em;
+    color: #555;
+    line-height: 1.6;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-info {
+    display: grid;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.file-item {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s;
+}
+
+.file-item:hover {
+    background: #f0f2f5;
+    border-color: #667eea;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #333;
+    flex: 1;
+    word-break: break-word;
+    margin-right: 10px;
+    line-height: 1.4;
+    font-size: 0.95em;
+}
+
+.file-size {
+    color: #666;
+    font-size: 0.9em;
+    min-width: 80px;
+    text-align: right;
+    margin-right: 10px;
+    font-weight: 600;
+}
+
+.volume-badge {
+    background: #667eea;
+    color: white;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9em;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.copy-button, .add-button {
+    padding: 8px 20px;
+    font-size: 0.9em;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 90px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.copy-button:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+}
+
+.add-button {
+    background: #28a745;
+    margin-left: 5px;
+}
+
+.add-button:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
+}
+
+.add-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.copied {
+    background: #28a745 !important;
+}
+
+/* Animation pour l'ouverture de la modal de recherche */
+#search-ed2k-modal.active {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsive pour les résultats de recherche */
+@media (max-width: 768px) {
+    .result-card {
+        grid-template-columns: 1fr;
+    }
+    
+    .cover-container {
+        width: 100%;
+        max-width: 200px;
+        margin: 0 auto;
+    }
+    
+    .cover-image {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    .file-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .file-size {
+        text-align: left;
+        margin-right: 0;
+    }
+    
+    .copy-button, .add-button {
+        width: 100%;
+        margin-left: 0;
+    }
+    
+    .missing-volumes-grid {
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    }
+}
+
+/* Amélioration de l'accessibilité */
+.missing-volume-card:focus {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+}
+
+.copy-button:focus, .add-button:focus {
+    outline: 3px solid rgba(102, 126, 234, 0.5);
+    outline-offset: 2px;
+}

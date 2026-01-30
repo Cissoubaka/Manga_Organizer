@@ -9,8 +9,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>📚 Mes Bibliothèques Manga</h1>
-            <p class="subtitle">Gérez vos collections de mangas</p>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>📚 Mes Bibliothèques Manga</h1>
+                    <p class="subtitle">Gérez vos collections de mangas</p>
+                </div>
+                <a href="/settings" class="btn" style="background: #6c757d;">⚙️ Configuration</a>
+            </div>
         </header>
 
         <div class="content">
@@ -18,7 +23,7 @@
                 <h2>Bibliothèques</h2>
                 <div style="display: flex; gap: 10px;">
 					<button class="btn" onclick="window.location.href='/search'" style="background: #f59e0b;">
-                        📥 Recherche
+                        🔍 Recherche
                     </button>
                     <button class="btn" onclick="window.location.href='/import'" style="background: #f59e0b;">
                         📥 Import de mangas

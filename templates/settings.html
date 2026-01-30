@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-settings.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>⚙️ Configuration</h1>
+                    <p class="subtitle">Paramètres de l'application</p>
+                </div>
+                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+            </div>
+        </header>
+
+        <div class="content">
+            <!-- Navigation par onglets -->
+            <div class="settings-tabs">
+                <button class="tab-button active" onclick="switchTab('amule')">
+                    🌐 aMule / eMule
+                </button>
+                <button class="tab-button" onclick="switchTab('general')" style="opacity: 0.5; cursor: not-allowed;" disabled>
+                    🔧 Général (bientôt)
+                </button>
+                <button class="tab-button" onclick="switchTab('notifications')" style="opacity: 0.5; cursor: not-allowed;" disabled>
+                    🔔 Notifications (bientôt)
+                </button>
+            </div>
+
+            <!-- Contenu des onglets -->
+            <div class="settings-content">
+                <!-- Onglet aMule -->
+                <div class="tab-content active" id="tab-amule">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>🌐 Configuration aMule / eMule</h2>
+                            <p class="section-description">
+                                Configurez la connexion à votre client aMule ou eMule pour ajouter automatiquement 
+                                les téléchargements depuis l'interface.
+                            </p>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" id="emuleEnabled">
+                                <label for="emuleEnabled">
+                                    <strong>Activer l'intégration aMule/eMule</strong>
+                                    <span class="help-text">Permet d'ajouter des liens ED2K directement depuis l'application</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emuleType">Type de client</label>
+                                <select id="emuleType" class="form-select">
+                                    <option value="amule">aMule (Linux/Mac)</option>
+                                    <option value="emule">eMule (Windows)</option>
+                                </select>
+                                <small class="help-text">Sélectionnez le client que vous utilisez</small>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="emuleHost">Hôte</label>
+                                    <input type="text" id="emuleHost" value="127.0.0.1" placeholder="127.0.0.1">
+                                    <small class="help-text">Adresse IP du serveur aMule/eMule</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="emuleEcPort">Port External Connections (EC)</label>
+                                    <input type="number" id="emuleEcPort" value="4712" placeholder="4712">
+                                    <small class="help-text">Port EC configuré dans aMule (défaut: 4712)</small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emulePassword">Mot de passe EC</label>
+                                <div class="password-input-group">
+                                    <input type="password" id="emulePassword" placeholder="Mot de passe External Connections">
+                                    <button type="button" class="btn-toggle-password" onclick="togglePassword()">
+                                        👁️ Afficher
+                                    </button>
+                                </div>
+                                <small class="help-text">Mot de passe configuré dans les préférences EC d'aMule</small>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-success" onclick="saveSettings()">
+                                    💾 Enregistrer
+                                </button>
+                                <button class="btn" onclick="testConnection()">
+                                    🔌 Tester la connexion
+                                </button>
+                                <button class="btn" onclick="resetSettings()">
+                                    🔄 Réinitialiser
+                                </button>
+                            </div>
+
+                            <div id="settingsMessage" class="message"></div>
+                        </div>
+
+                        <!-- Aide configuration -->
+                        <div class="help-section">
+                            <h3>📖 Aide à la configuration</h3>
+                            
+                            <details class="help-details">
+                                <summary>Comment configurer aMule sur Linux ?</summary>
+                                <div class="help-content">
+                                    <ol>
+                                        <li>Ouvrez aMule</li>
+                                        <li>Allez dans <strong>Préférences > Connexions à distance</strong></li>
+                                        <li>Cochez <strong>"Activer les External Connections"</strong></li>
+                                        <li>Définissez un mot de passe EC</li>
+                                        <li>Notez le port (défaut: 4712)</li>
+                                        <li>Installez amule-utils : <code>sudo apt install amule-utils</code></li>
+                                        <li>Redémarrez aMule</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>Comment configurer eMule sur Windows ?</summary>
+                                <div class="help-content">
+                                    <ol>
+                                        <li>Ouvrez eMule</li>
+                                        <li>Allez dans <strong>Options > Interface Web</strong></li>
+                                        <li>Cochez <strong>"Activer le serveur web"</strong></li>
+                                        <li>Définissez un mot de passe</li>
+                                        <li>Notez le port (défaut: 4711)</li>
+                                        <li>Redémarrez eMule</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>La connexion échoue, que faire ?</summary>
+                                <div class="help-content">
+                                    <ul>
+                                        <li>✅ Vérifiez que aMule/eMule est bien démarré</li>
+                                        <li>✅ Vérifiez le mot de passe EC</li>
+                                        <li>✅ Vérifiez que le port EC est correct</li>
+                                        <li>✅ Vérifiez que le pare-feu n'est pas bloquant</li>
+                                        <li>✅ Pour aMule : vérifiez que amule-utils est installé</li>
+                                        <li>✅ Testez avec <code>amulecmd -h 127.0.0.1 -P votreMotDePasse -c status</code></li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Onglet Général (futur) -->
+                <div class="tab-content" id="tab-general">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>🔧 Paramètres généraux</h2>
+                            <p class="section-description">À venir prochainement...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Onglet Notifications (futur) -->
+                <div class="tab-content" id="tab-notifications">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>🔔 Notifications</h2>
+                            <p class="section-description">À venir prochainement...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let passwordVisible = false;
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/emule/config');
+                const config = await response.json();
+                
+                document.getElementById('emuleEnabled').checked = config.enabled;
+                document.getElementById('emuleType').value = config.type || 'amule';
+                document.getElementById('emuleHost').value = config.host;
+                document.getElementById('emuleEcPort').value = config.ec_port;
+                
+                // Ne pas afficher le mot de passe masqué
+                if (config.password && config.password !== '****') {
+                    document.getElementById('emulePassword').value = config.password;
+                }
+            } catch (error) {
+                showMessage('❌ Erreur lors du chargement de la configuration', 'error');
+                console.error('Erreur:', error);
+            }
+        }
+
+        async function saveSettings() {
+            const config = {
+                enabled: document.getElementById('emuleEnabled').checked,
+                type: document.getElementById('emuleType').value,
+                host: document.getElementById('emuleHost').value,
+                ec_port: parseInt(document.getElementById('emuleEcPort').value),
+                password: document.getElementById('emulePassword').value
+            };
+
+            // Validation
+            if (config.enabled && !config.password) {
+                showMessage('⚠️ Veuillez entrer un mot de passe EC', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/emule/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('✅ Configuration enregistrée avec succès !', 'success');
+                } else {
+                    showMessage('❌ Erreur: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Erreur de connexion: ' + error.message, 'error');
+            }
+        }
+
+        async function testConnection() {
+            showMessage('⏳ Test de connexion en cours...', 'info');
+            
+            try {
+                const response = await fetch('/api/emule/test');
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('✅ Connexion réussie à aMule/eMule !', 'success');
+                } else {
+                    showMessage('❌ Échec de la connexion: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Erreur: ' + error.message, 'error');
+            }
+        }
+
+        function resetSettings() {
+            if (!confirm('Voulez-vous réinitialiser la configuration aMule/eMule ?')) {
+                return;
+            }
+
+            document.getElementById('emuleEnabled').checked = false;
+            document.getElementById('emuleType').value = 'amule';
+            document.getElementById('emuleHost').value = '127.0.0.1';
+            document.getElementById('emuleEcPort').value = '4712';
+            document.getElementById('emulePassword').value = '';
+            
+            showMessage('🔄 Configuration réinitialisée', 'info');
+        }
+
+        function togglePassword() {
+            const passwordInput = document.getElementById('emulePassword');
+            const toggleButton = document.querySelector('.btn-toggle-password');
+            
+            passwordVisible = !passwordVisible;
+            
+            if (passwordVisible) {
+                passwordInput.type = 'text';
+                toggleButton.textContent = '🙈 Masquer';
+            } else {
+                passwordInput.type = 'password';
+                toggleButton.textContent = '👁️ Afficher';
+            }
+        }
+
+        function switchTab(tabName) {
+            // Désactiver tous les onglets
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Activer l'onglet sélectionné
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('settingsMessage');
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+            msg.style.display = 'block';
+            
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 5000);
+        }
+
+        // Charger les paramètres au démarrage
+        window.addEventListener('load', loadSettings);
+    </script>
+</body>
+</html>

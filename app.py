@@ -208,12 +208,12 @@ class LibraryScanner:
                 info['author'] = author_dash_match.group(1).strip()
 
         # Extraire l'année
-        year_match = re.search(r'\((\d{4})\)', filename)
+        year_match = re.search(r'\b(19\d{2}|20\d{2})\b', filename)
         if year_match:
             info['year'] = int(year_match.group(1))
 
-        # Extraire la résolution (1920x1080, 1080p, etc.)
-        resolution_match = re.search(r'(\d{3,4}[px]\d{0,4}|\d{3,4}p)', filename, re.IGNORECASE)
+        # Extraire la résolution (1920x1080, etc.)
+        resolution_match = re.search(r'(\d{3,4}x\d{3,4})', filename)
         if resolution_match:
             info['resolution'] = resolution_match.group(1)
 
@@ -254,7 +254,12 @@ class LibraryScanner:
         return 0
 
     def scan_directory(self, library_id, library_path):
-        """Scanne un répertoire pour détecter les séries et volumes"""
+        """Scanne un répertoire pour détecter les séries et volumes
+        
+        CORRECTION DU BUG:
+        - Les sous-répertoires directs de library_path sont les séries
+        - Les fichiers dans chaque sous-répertoire sont les volumes de cette série
+        """
         print(f"\n📂 Scan du répertoire: {library_path}")
 
         if not os.path.exists(library_path):
@@ -264,32 +269,77 @@ class LibraryScanner:
         supported_extensions = {'.cbz', '.cbr', '.zip', '.rar', '.pdf', '.epub'}
 
         # Structure pour grouper les fichiers par série
+        # Clé = nom du sous-répertoire (= nom de la série)
         series_data = defaultdict(lambda: {
             'volumes': [],
             'path': None
         })
 
-        # Parcourir récursivement
-        for root, dirs, files in os.walk(library_path):
-            for filename in files:
-                ext = os.path.splitext(filename)[1].lower()
-
+        # Parcourir le répertoire de la bibliothèque
+        try:
+            # Lister tous les éléments dans le répertoire de la bibliothèque
+            items = os.listdir(library_path)
+        except PermissionError as e:
+            raise Exception(f"Permission refusée pour accéder à {library_path}")
+        
+        for item in items:
+            item_path = os.path.join(library_path, item)
+            
+            # Si c'est un répertoire, c'est une série
+            if os.path.isdir(item_path):
+                series_title = item  # Le nom du dossier EST le nom de la série
+                series_data[series_title]['path'] = item_path
+                
+                # Scanner tous les fichiers dans ce répertoire de série
+                try:
+                    for filename in os.listdir(item_path):
+                        filepath = os.path.join(item_path, filename)
+                        
+                        # Ignorer les sous-répertoires
+                        if os.path.isdir(filepath):
+                            continue
+                        
+                        ext = os.path.splitext(filename)[1].lower()
+                        
+                        if ext in supported_extensions:
+                            parsed = self.parse_filename(filename)
+                            
+                            series_data[series_title]['volumes'].append({
+                                'filename': filename,
+                                'filepath': filepath,
+                                'parsed': parsed,
+                                'file_size': os.path.getsize(filepath)
+                            })
+                except PermissionError:
+                    print(f"⚠️  Permission refusée pour {item_path}")
+                    continue
+            
+            # Si c'est un fichier directement dans la bibliothèque (pas dans un sous-dossier)
+            elif os.path.isfile(item_path):
+                ext = os.path.splitext(item)[1].lower()
+                
                 if ext in supported_extensions:
-                    filepath = os.path.join(root, filename)
-                    parsed = self.parse_filename(filename)
-
+                    # Parser le nom de fichier pour extraire le titre
+                    parsed = self.parse_filename(item)
+                    
+                    # Utiliser le titre extrait comme nom de série
+                    # (fallback si fichiers pas organisés en dossiers)
                     if parsed['title']:
                         series_title = parsed['title']
-                        series_data[series_title]['volumes'].append({
-                            'filename': filename,
-                            'filepath': filepath,
-                            'parsed': parsed,
-                            'file_size': os.path.getsize(filepath)
-                        })
-
-                        # Si c'est dans un sous-dossier, considérer que c'est le dossier de la série
-                        if root != library_path:
-                            series_data[series_title]['path'] = root
+                    else:
+                        # Si pas de titre détecté, utiliser le nom du fichier sans extension
+                        series_title = os.path.splitext(item)[0]
+                    
+                    # Le path de la série sera la bibliothèque elle-même
+                    if not series_data[series_title]['path']:
+                        series_data[series_title]['path'] = library_path
+                    
+                    series_data[series_title]['volumes'].append({
+                        'filename': item,
+                        'filepath': item_path,
+                        'parsed': parsed,
+                        'file_size': os.path.getsize(item_path)
+                    })
 
         print(f"✓ {len(series_data)} séries détectées")
 
@@ -313,25 +363,16 @@ class LibraryScanner:
                 # Mettre à jour la série existante
                 series_id = result[0]
                 
-                # ===== CORRECTION : Mettre à jour le path de la série =====
-                # Si series_path est défini (fichiers dans un sous-dossier), mettre à jour
+                # Mettre à jour le path de la série
                 if series_path:
                     cursor.execute('UPDATE series SET path = ? WHERE id = ?', (series_path, series_id))
-                # Sinon, s'assurer qu'il y a un path par défaut (bibliothèque/titre)
-                else:
-                    default_path = os.path.join(library_path, series_title)
-                    cursor.execute('UPDATE series SET path = ? WHERE id = ?', (default_path, series_id))
-                # ==========================================================
 
                 # Supprimer les anciens volumes pour cette série
                 cursor.execute('DELETE FROM volumes WHERE series_id = ?', (series_id,))
             else:
                 # Créer une nouvelle série
-                # ===== CORRECTION : S'assurer qu'il y a toujours un path =====
                 if not series_path:
                     series_path = os.path.join(library_path, series_title)
-                    os.makedirs(series_path, exist_ok=True)
-                # ==========================================================
                 
                 cursor.execute('''
                     INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
@@ -365,10 +406,52 @@ class LibraryScanner:
                     parsed['format']
                 ))
 
-            # Mettre à jour les statistiques de la série
-            self.update_series_stats(series_id, conn)
+            # Calculer les statistiques de la série
+            cursor.execute('''
+                SELECT COUNT(*), MAX(volume_number)
+                FROM volumes
+                WHERE series_id = ?
+            ''', (series_id,))
 
-        # Mettre à jour la date de dernier scan de la bibliothèque
+            total_volumes, max_volume = cursor.fetchone()
+
+            # Détecter s'il y a des parties
+            cursor.execute('''
+                SELECT COUNT(DISTINCT part_number)
+                FROM volumes
+                WHERE series_id = ? AND part_number IS NOT NULL
+            ''', (series_id,))
+
+            has_parts = cursor.fetchone()[0] > 0
+
+            # Calculer les volumes manquants
+            cursor.execute('''
+                SELECT volume_number FROM volumes
+                WHERE series_id = ? AND volume_number IS NOT NULL
+                ORDER BY volume_number
+            ''', (series_id,))
+
+            existing_volumes = [row[0] for row in cursor.fetchall()]
+            missing_volumes = []
+
+            if max_volume and existing_volumes:
+                for i in range(1, max_volume + 1):
+                    if i not in existing_volumes:
+                        missing_volumes.append(i)
+
+            # Mettre à jour la série
+            cursor.execute('''
+                UPDATE series
+                SET total_volumes = ?,
+                    missing_volumes = ?,
+                    has_parts = ?,
+                    last_scanned = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (total_volumes, json.dumps(missing_volumes), 1 if has_parts else 0, series_id))
+
+            print(f"  ✓ {series_title}: {total_volumes} volumes")
+
+        # Mettre à jour la date de scan de la bibliothèque
         cursor.execute('''
             UPDATE libraries
             SET last_scanned = CURRENT_TIMESTAMP
@@ -380,134 +463,140 @@ class LibraryScanner:
 
         return len(series_data)
 
-    def update_series_stats(self, series_id, conn=None):
-        """Met à jour les statistiques d'une série (total volumes, volumes manquants)
-        
-        Args:
-            series_id: ID de la série à mettre à jour
-            conn: Connexion SQLite existante (optionnel). Si None, une nouvelle connexion sera créée.
-        """
-        # Si aucune connexion n'est fournie, en créer une nouvelle
-        close_conn = False
-        if conn is None:
-            conn = sqlite3.connect(self.db_path, timeout=30.0)
-            close_conn = True
-        
+    def get_library_stats(self, library_id):
+        """Récupère les statistiques d'une bibliothèque"""
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Récupérer tous les numéros de volumes
+        # Nombre de séries
+        cursor.execute('SELECT COUNT(*) FROM series WHERE library_id = ?', (library_id,))
+        series_count = cursor.fetchone()[0]
+
+        # Nombre total de volumes
         cursor.execute('''
-            SELECT DISTINCT volume_number
-            FROM volumes
-            WHERE series_id = ? AND volume_number IS NOT NULL
-            ORDER BY volume_number
-        ''', (series_id,))
+            SELECT COUNT(*)
+            FROM volumes v
+            JOIN series s ON v.series_id = s.id
+            WHERE s.library_id = ?
+        ''', (library_id,))
+        volumes_count = cursor.fetchone()[0]
 
-        volume_numbers = [row[0] for row in cursor.fetchall()]
+        conn.close()
 
-        if not volume_numbers:
-            cursor.execute('''
-                UPDATE series
-                SET total_volumes = 0, missing_volumes = '[]', has_parts = 0
-                WHERE id = ?
-            ''', (series_id,))
-            if close_conn:
-                conn.commit()
-                conn.close()
-            return
+        return {
+            'series_count': series_count,
+            'volumes_count': volumes_count
+        }
 
-        # Détecter les volumes manquants
-        min_vol = min(volume_numbers)
-        max_vol = max(volume_numbers)
-        expected_volumes = set(range(min_vol, max_vol + 1))
-        actual_volumes = set(volume_numbers)
-        missing_volumes = sorted(expected_volumes - actual_volumes)
 
-        # Vérifier si la série a des parties
-        cursor.execute('''
-            SELECT COUNT(DISTINCT part_number)
-            FROM volumes
-            WHERE series_id = ? AND part_number IS NOT NULL
-        ''', (series_id,))
+def load_emule_config():
+    """Charge la configuration eMule depuis le fichier"""
+    global EMULE_CONFIG
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                saved_config = json.load(f)
+                EMULE_CONFIG.update(saved_config)
+                print("[CONFIG] Configuration eMule chargée")
+    except Exception as e:
+        print(f"[ERROR] Erreur chargement config: {e}")
 
-        has_parts = cursor.fetchone()[0] > 1
+def save_emule_config():
+    """Sauvegarde la configuration eMule dans le fichier"""
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(EMULE_CONFIG, f, indent=2)
+        print("[CONFIG] Configuration eMule sauvegardée")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Erreur sauvegarde config: {e}")
+        return False
 
-        # Mettre à jour
-        cursor.execute('''
-            UPDATE series
-            SET total_volumes = ?,
-                missing_volumes = ?,
-                has_parts = ?,
-                last_scanned = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (
-            len(volume_numbers),
-            json.dumps(missing_volumes),
-            1 if has_parts else 0,
-            series_id
-        ))
+# Charger la config au démarrage
+load_emule_config()
 
-        # Commit et fermeture seulement si on a créé la connexion
-        if close_conn:
-            conn.commit()
-            conn.close()
-
-# Routes Flask
+# ROUTES WEB
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/library/<int:library_id>')
-def library(library_id):
+def library_view(library_id):
     return render_template('library.html', library_id=library_id)
 
 @app.route('/import')
 def import_page():
     return render_template('import.html')
 
-# API Routes
+@app.route('/search')
+def search_page():
+    """Page de recherche ED2K"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    # Récupérer les statistiques
+    cursor.execute('SELECT COUNT(*) FROM ed2k_links')
+    total_links = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT COUNT(DISTINCT thread_id) FROM ed2k_links')
+    total_threads = cursor.fetchone()[0]
+    
+    # Récupérer les catégories uniques
+    cursor.execute('SELECT DISTINCT forum_category FROM ed2k_links WHERE forum_category IS NOT NULL ORDER BY forum_category')
+    categories = [row[0] for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return render_template('search.html', 
+                         total_links=total_links, 
+                         total_threads=total_threads,
+                         categories=categories)
+
+@app.route('/settings')
+def settings_page():
+    return render_template('settings.html')
+
+# API ROUTES
+
 @app.route('/api/libraries', methods=['GET', 'POST'])
 def libraries():
+    scanner = LibraryScanner()
+
     if request.method == 'GET':
-        conn = sqlite3.connect(DATABASE, timeout=30.0)
-        conn.row_factory = sqlite3.Row
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        cursor.execute('''
-            SELECT
-                l.id,
-                l.name,
-                l.path,
-                l.description,
-                l.last_scanned,
-                COUNT(DISTINCT s.id) as series_count,
-                COUNT(v.id) as volumes_count
-            FROM libraries l
-            LEFT JOIN series s ON l.id = s.library_id
-            LEFT JOIN volumes v ON s.id = v.series_id
-            GROUP BY l.id
-            ORDER BY l.name
-        ''')
+        cursor.execute('SELECT * FROM libraries ORDER BY name')
+        libraries = cursor.fetchall()
 
-        libraries = [dict(row) for row in cursor.fetchall()]
+        result = []
+        for lib in libraries:
+            stats = scanner.get_library_stats(lib[0])
+            result.append({
+                'id': lib[0],
+                'name': lib[1],
+                'path': lib[2],
+                'description': lib[3],
+                'created_at': lib[4],
+                'last_scanned': lib[5],
+                'series_count': stats['series_count'],
+                'volumes_count': stats['volumes_count']
+            })
+
         conn.close()
+        return jsonify(result)
 
-        return jsonify(libraries)
-
-    elif request.method == 'POST':
-        data = request.json
+    else:  # POST
+        data = request.get_json()
         name = data.get('name')
         path = data.get('path')
         description = data.get('description', '')
 
         if not name or not path:
-            return jsonify({'error': 'Nom et chemin requis'}), 400
-
-        if not os.path.exists(path):
-            return jsonify({'error': 'Le chemin spécifié n\'existe pas'}), 400
+            return jsonify({'success': False, 'error': 'Nom et chemin requis'}), 400
 
         try:
-            conn = sqlite3.connect(DATABASE, timeout=30.0)
+            conn = sqlite3.connect(DATABASE)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -515,41 +604,39 @@ def libraries():
                 VALUES (?, ?, ?)
             ''', (name, path, description))
 
-            library_id = cursor.lastrowid
             conn.commit()
             conn.close()
 
-            return jsonify({'success': True, 'id': library_id})
+            return jsonify({'success': True})
+
         except sqlite3.IntegrityError:
-            return jsonify({'error': 'Une bibliothèque avec ce nom existe déjà'}), 400
+            return jsonify({'success': False, 'error': 'Une bibliothèque avec ce nom existe déjà'}), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/libraries/<int:library_id>', methods=['GET', 'DELETE'])
-def library_detail(library_id):
-    conn = sqlite3.connect(DATABASE, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+@app.route('/api/libraries/<int:library_id>', methods=['DELETE'])
+def delete_library(library_id):
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
 
-    if request.method == 'GET':
-        cursor.execute('SELECT * FROM libraries WHERE id = ?', (library_id,))
-        library = cursor.fetchone()
-        conn.close()
-
-        if library:
-            return jsonify(dict(library))
-        else:
-            return jsonify({'error': 'Bibliothèque introuvable'}), 404
-
-    elif request.method == 'DELETE':
+        # Supprimer la bibliothèque (cascade supprime aussi les séries et volumes)
         cursor.execute('DELETE FROM libraries WHERE id = ?', (library_id,))
+
         conn.commit()
         conn.close()
 
         return jsonify({'success': True})
 
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/scan/<int:library_id>')
 def scan_library(library_id):
     try:
-        conn = sqlite3.connect(DATABASE, timeout=30.0)
+        scanner = LibraryScanner()
+
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
         cursor.execute('SELECT path FROM libraries WHERE id = ?', (library_id,))
@@ -557,645 +644,301 @@ def scan_library(library_id):
         conn.close()
 
         if not result:
-            return jsonify({'error': 'Bibliothèque introuvable'}), 404
+            return jsonify({'success': False, 'error': 'Bibliothèque introuvable'}), 404
 
         library_path = result[0]
-
-        scanner = LibraryScanner()
         series_count = scanner.scan_directory(library_id, library_path)
 
-        return jsonify({
-            'success': True,
-            'series_count': series_count
-        })
+        return jsonify({'success': True, 'series_count': series_count})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/library/<int:library_id>/series')
-def library_series(library_id):
-    conn = sqlite3.connect(DATABASE, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT
-            s.*,
-            COUNT(v.id) as total_volumes
-        FROM series s
-        LEFT JOIN volumes v ON s.id = v.series_id
-        WHERE s.library_id = ?
-        GROUP BY s.id
-        ORDER BY s.title
-    ''', (library_id,))
-
-    series = []
-    for row in cursor.fetchall():
-        s = dict(row)
-        s['missing_volumes'] = json.loads(s['missing_volumes'])
-        series.append(s)
-
-    conn.close()
-
-    return jsonify(series)
-
-@app.route('/api/library/<int:library_id>/stats')
-def library_stats(library_id):
-    conn = sqlite3.connect(DATABASE, timeout=30.0)
-    cursor = conn.cursor()
-
-    # Total séries
-    cursor.execute('SELECT COUNT(*) FROM series WHERE library_id = ?', (library_id,))
-    total_series = cursor.fetchone()[0]
-
-    # Total volumes
-    cursor.execute('''
-        SELECT COUNT(*)
-        FROM volumes v
-        JOIN series s ON v.series_id = s.id
-        WHERE s.library_id = ?
-    ''', (library_id,))
-    total_volumes = cursor.fetchone()[0]
-
-    # Taille totale
-    cursor.execute('''
-        SELECT COALESCE(SUM(v.file_size), 0)
-        FROM volumes v
-        JOIN series s ON v.series_id = s.id
-        WHERE s.library_id = ?
-    ''', (library_id,))
-    total_size = cursor.fetchone()[0]
-
-    # Moyenne de pages
-    cursor.execute('''
-        SELECT COALESCE(AVG(v.page_count), 0)
-        FROM volumes v
-        JOIN series s ON v.series_id = s.id
-        WHERE s.library_id = ? AND v.page_count > 0
-    ''', (library_id,))
-    avg_pages = int(cursor.fetchone()[0])
-
-    conn.close()
-
-    return jsonify({
-        'total_series': total_series,
-        'total_volumes': total_volumes,
-        'total_size': total_size,
-        'avg_pages': avg_pages
-    })
-
-@app.route('/api/series/<int:series_id>/volumes')
-def series_volumes(series_id):
-    conn = sqlite3.connect(DATABASE, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT *
-        FROM volumes
-        WHERE series_id = ?
-        ORDER BY part_number, volume_number
-    ''', (series_id,))
-
-    volumes = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-
-    return jsonify(volumes)
-
-@app.route('/api/import/scan', methods=['POST'])
-def scan_import_directory():
-    """Scanne un répertoire pour trouver les fichiers à importer"""
-    data = request.json
-    import_path = data.get('path', '')
-
-    if not import_path or not os.path.exists(import_path):
-        return jsonify({'error': 'Chemin invalide ou inexistant'}), 400
-
+def get_library_series(library_id):
     try:
-        scanner = LibraryScanner()
-        supported_extensions = {'.cbz', '.cbr', '.zip', '.rar', '.pdf', '.epub'}
-
-        files_found = []
-
-        # Parcourir le répertoire
-        for root, dirs, files in os.walk(import_path):
-            for filename in files:
-                ext = os.path.splitext(filename)[1].lower()
-
-                if ext in supported_extensions:
-                    filepath = os.path.join(root, filename)
-                    parsed = scanner.parse_filename(filename)
-
-                    files_found.append({
-                        'filename': filename,
-                        'filepath': filepath,
-                        'relative_path': os.path.relpath(filepath, import_path),
-                        'file_size': os.path.getsize(filepath),
-                        'parsed': parsed
-                    })
-
-        return jsonify({
-            'success': True,
-            'files': files_found,
-            'count': len(files_found)
-        })
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/import/execute', methods=['POST'])
-def execute_import():
-    """Exécute l'import des fichiers vers leurs destinations"""
-    data = request.json
-    files_to_import = data.get('files', [])
-    import_base_path = data.get('import_path', '')
-
-    if not files_to_import:
-        return jsonify({'error': 'Aucun fichier à importer'}), 400
-
-    try:
-        scanner = LibraryScanner()
-        imported_count = 0
-        replaced_count = 0
-        skipped_count = 0
-        failed_count = 0
-        failures = []
-
-        # Créer les répertoires spéciaux à la racine du répertoire d'import
-        if import_base_path:
-            old_files_dir = os.path.join(import_base_path, '_old_files')
-            doublons_dir = os.path.join(import_base_path, '_doublons')
-            os.makedirs(old_files_dir, exist_ok=True)
-            os.makedirs(doublons_dir, exist_ok=True)
-
-        # Traiter chaque fichier
-        for file_data in files_to_import:
-            try:
-                source_path = file_data['filepath']
-                destination = file_data.get('destination')
-                source_size = file_data.get('file_size', 0)
-
-                if not destination:
-                    failed_count += 1
-                    failures.append({
-                        'file': file_data['filename'],
-                        'error': 'Pas de destination définie'
-                    })
-                    continue
-
-                # Récupérer ou créer la série
-                conn = sqlite3.connect(DATABASE, timeout=30)
-                #conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-
-                if destination.get('is_new_series'):
-                    # Créer une nouvelle série
-                    series_title = destination['series_title']
-                    library_id = destination['library_id']
-                    library_path = destination['library_path']
-
-                    # ===== CORRECTION DU BUG =====
-                    # Créer le dossier de la série DANS le dossier de la bibliothèque
-                    series_path = os.path.join(library_path, series_title)
-                    os.makedirs(series_path, exist_ok=True)
-                    # =============================
-
-                    # Insérer la série dans la base
-                    cursor.execute('''
-                        INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
-                        VALUES (?, ?, ?, 0, '[]', 0)
-                    ''', (library_id, series_title, series_path))
-
-                    series_id = cursor.lastrowid
-                    target_dir = series_path
-                else:
-                    # Utiliser une série existante
-                    series_id = destination['series_id']
-                    library_path = destination['library_path']
-                    series_title = destination['series_title']
-
-                    # ===== CORRECTION DU BUG =====
-                    # TOUJOURS construire le chemin correct basé sur bibliothèque + nom série
-                    # Ne PAS faire confiance au path en base de données qui peut être incorrect
-                    target_dir = os.path.join(library_path, series_title)
-                    
-                    # Créer le dossier s'il n'existe pas
-                    os.makedirs(target_dir, exist_ok=True)
-                    
-                    # Mettre à jour le chemin de la série dans la base de données
-                    cursor.execute('UPDATE series SET path = ? WHERE id = ?', (target_dir, series_id))
-                    # =============================
-
-                # Construire le chemin de destination
-                target_path = os.path.join(target_dir, file_data['filename'])
-
-                # NOUVELLE LOGIQUE : Vérifier si un fichier existe déjà avec le même numéro de volume
-                import shutil
-                volume_number = file_data['parsed'].get('volume')
-                existing_file_path = None
-                existing_file_size = 0
-
-                if volume_number:
-                    # Chercher un fichier existant pour ce volume dans la base de données
-                    cursor.execute('''
-                        SELECT filepath, file_size FROM volumes
-                        WHERE series_id = ? AND volume_number = ?
-                        ORDER BY id DESC LIMIT 1
-                    ''', (series_id, volume_number))
-
-                    existing_volume = cursor.fetchone()
-                    if existing_volume:
-                        existing_file_path = existing_volume[0]
-                        existing_file_size = existing_volume[1]
-
-                action_taken = None
-
-                # Si un fichier existe déjà pour ce volume
-                if existing_file_path and os.path.exists(existing_file_path):
-                    # Comparer les tailles
-                    if source_size > existing_file_size:
-                        # Le nouveau fichier est plus gros : remplacer
-                        print(f"Remplacement: {file_data['filename']} ({source_size} bytes) > ancien ({existing_file_size} bytes)")
-
-                        # Déplacer l'ancien fichier vers _old_files
-                        old_filename = os.path.basename(existing_file_path)
-                        old_dest_path = os.path.join(old_files_dir, old_filename)
-
-                        # Si le fichier existe déjà dans _old_files, ajouter un timestamp
-                        if os.path.exists(old_dest_path):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            base, ext = os.path.splitext(old_filename)
-                            old_dest_path = os.path.join(old_files_dir, f"{base}_{timestamp}{ext}")
-
-                        shutil.move(existing_file_path, old_dest_path)
-
-                        # Supprimer l'ancien volume de la base de données
-                        cursor.execute('DELETE FROM volumes WHERE filepath = ?', (existing_file_path,))
-
-                        # Déplacer le nouveau fichier
-                        shutil.move(source_path, target_path)
-                        action_taken = 'replaced'
-                        replaced_count += 1
-
-                    else:
-                        # Le nouveau fichier est plus petit ou égal : ne pas importer
-                        print(f"Doublon ignoré: {file_data['filename']} ({source_size} bytes) <= existant ({existing_file_size} bytes)")
-
-                        # Déplacer vers _doublons
-                        doublon_path = os.path.join(doublons_dir, file_data['filename'])
-
-                        # Si le fichier existe déjà dans _doublons, ajouter un timestamp
-                        if os.path.exists(doublon_path):
-                            from datetime import datetime
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            base, ext = os.path.splitext(file_data['filename'])
-                            doublon_path = os.path.join(doublons_dir, f"{base}_{timestamp}{ext}")
-
-                        shutil.move(source_path, doublon_path)
-                        action_taken = 'skipped_duplicate'
-                        skipped_count += 1
-                        conn.close()
-                        continue
-                else:
-                    # Pas de fichier existant : import normal
-                    # Si le fichier de destination existe déjà (même nom de fichier)
-                    if os.path.exists(target_path):
-                        base, ext = os.path.splitext(file_data['filename'])
-                        counter = 1
-                        while os.path.exists(target_path):
-                            target_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
-                            counter += 1
-
-                    # Déplacer le fichier
-                    shutil.move(source_path, target_path)
-                    action_taken = 'imported'
-                    imported_count += 1
-
-                # Ajouter le volume à la base de données (sauf si skipped)
-                if action_taken != 'skipped_duplicate':
-                    parsed = file_data['parsed']
-                    page_count = scanner.get_page_count(target_path, parsed['format'])
-
-                    cursor.execute('''
-                        INSERT INTO volumes
-                        (series_id, part_number, part_name, volume_number, filename, filepath,
-                         author, year, resolution, file_size, page_count, format)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        series_id, parsed['part_number'], parsed['part_name'], parsed['volume'],
-                        os.path.basename(target_path), target_path, parsed['author'], parsed['year'],
-                        parsed['resolution'], source_size, page_count, parsed['format']
-                    ))
-
-                conn.commit()
-                conn.close()
-
-            except Exception as e:
-                failed_count += 1
-                failures.append({
-                    'file': file_data['filename'],
-                    'error': str(e)
-                })
-                print(f"Erreur import {file_data['filename']}: {e}")
-                import traceback
-                traceback.print_exc()
-
-        # Mettre à jour les statistiques des séries concernées
-        conn = sqlite3.connect(DATABASE, timeout=30.0)
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        # Récupérer toutes les séries uniques qui ont reçu des fichiers
-        series_ids = set()
-        for file_data in files_to_import:
-            dest = file_data.get('destination')
-            if dest and dest.get('series_id'):
-                series_ids.add(dest['series_id'])
+        # Récupérer toutes les séries de la bibliothèque
+        cursor.execute('''
+            SELECT id, title, path, total_volumes, missing_volumes, has_parts, last_scanned
+            FROM series
+            WHERE library_id = ?
+            ORDER BY title
+        ''', (library_id,))
 
-        # Mettre à jour chaque série
-        for series_id in series_ids:
-            scanner.update_series_stats(series_id, conn)
+        series_list = []
+        for row in cursor.fetchall():
+            missing_volumes = json.loads(row[4]) if row[4] else []
+
+            series_list.append({
+                'id': row[0],
+                'title': row[1],
+                'path': row[2],
+                'total_volumes': row[3],
+                'missing_volumes': missing_volumes,
+                'has_parts': bool(row[5]),
+                'last_scanned': row[6]
+            })
+
+        conn.close()
+        return jsonify(series_list)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/series/<int:series_id>')
+def get_series_details(series_id):
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        # Récupérer les infos de la série
+        cursor.execute('''
+            SELECT s.id, s.title, s.path, s.total_volumes, s.missing_volumes, s.has_parts,
+                   l.id, l.name
+            FROM series s
+            JOIN libraries l ON s.library_id = l.id
+            WHERE s.id = ?
+        ''', (series_id,))
+
+        series_row = cursor.fetchone()
+
+        if not series_row:
+            return jsonify({'error': 'Série introuvable'}), 404
+
+        missing_volumes = json.loads(series_row[4]) if series_row[4] else []
+
+        # Récupérer tous les volumes
+        cursor.execute('''
+            SELECT id, part_number, part_name, volume_number, filename, filepath,
+                   author, year, resolution, file_size, page_count, format
+            FROM volumes
+            WHERE series_id = ?
+            ORDER BY part_number, volume_number
+        ''', (series_id,))
+
+        volumes = []
+        for vol in cursor.fetchall():
+            volumes.append({
+                'id': vol[0],
+                'part_number': vol[1],
+                'part_name': vol[2],
+                'volume_number': vol[3],
+                'filename': vol[4],
+                'filepath': vol[5],
+                'author': vol[6],
+                'year': vol[7],
+                'resolution': vol[8],
+                'file_size': vol[9],
+                'page_count': vol[10],
+                'format': vol[11]
+            })
 
         conn.close()
 
-        # Nettoyer les répertoires vides dans le répertoire d'import
-        if import_base_path:
-            cleaned_dirs = cleanup_empty_directories(import_base_path)
-        else:
-            cleaned_dirs = 0
-
         return jsonify({
-            'success': True,
-            'imported_count': imported_count,
-            'replaced_count': replaced_count,
-            'skipped_count': skipped_count,
-            'failed_count': failed_count,
-            'failures': failures,
-            'cleaned_directories': cleaned_dirs
+            'id': series_row[0],
+            'title': series_row[1],
+            'path': series_row[2],
+            'total_volumes': series_row[3],
+            'missing_volumes': missing_volumes,
+            'has_parts': bool(series_row[5]),
+            'library': {
+                'id': series_row[6],
+                'name': series_row[7]
+            },
+            'volumes': volumes
         })
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def cleanup_empty_directories(base_path):
-    """
-    Nettoie les répertoires vides dans le chemin d'import
-    Ignore _old_files et _doublons
-    Retourne le nombre de répertoires supprimés
-    """
-    if not os.path.exists(base_path):
-        return 0
-
-    deleted_count = 0
-    protected_dirs = ['_old_files', '_doublons']
-
-    # Parcourir en ordre inverse (du plus profond au plus superficiel)
-    # pour supprimer les sous-répertoires vides avant les parents
-    for root, dirs, files in os.walk(base_path, topdown=False):
-        # Ignorer les répertoires protégés et leurs sous-répertoires
-        relative_path = os.path.relpath(root, base_path)
-        path_parts = relative_path.split(os.sep)
-
-        # Ne pas toucher aux répertoires protégés
-        if any(protected in path_parts for protected in protected_dirs):
-            continue
-
-        # Ne pas supprimer le répertoire de base lui-même
-        if root == base_path:
-            continue
-
-        # Vérifier si le répertoire est vide (pas de fichiers, pas de sous-répertoires)
-        try:
-            if not os.listdir(root):  # Répertoire complètement vide
-                print(f"Suppression du répertoire vide: {root}")
-                os.rmdir(root)
-                deleted_count += 1
-        except (OSError, PermissionError) as e:
-            print(f"Impossible de supprimer {root}: {e}")
-
-    return deleted_count
-
-@app.route('/api/import/cleanup', methods=['POST'])
-def cleanup_import_directory():
-    """Nettoie les répertoires vides du répertoire d'import"""
-    data = request.json
-    import_path = data.get('path', '')
-
-    if not import_path or not os.path.exists(import_path):
-        return jsonify({'error': 'Chemin invalide ou inexistant'}), 400
-
+@app.route('/api/library/<int:library_id>/stats')
+def get_library_stats_route(library_id):
+    """Récupère les statistiques détaillées d'une bibliothèque"""
     try:
-        cleaned_count = cleanup_empty_directories(import_path)
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        # Nombre total de séries
+        cursor.execute('''
+            SELECT COUNT(*) FROM series WHERE library_id = ?
+        ''', (library_id,))
+        total_series = cursor.fetchone()[0]
+
+        # Nombre total de volumes
+        cursor.execute('''
+            SELECT COUNT(*) 
+            FROM volumes v
+            JOIN series s ON v.series_id = s.id
+            WHERE s.library_id = ?
+        ''', (library_id,))
+        total_volumes = cursor.fetchone()[0]
+
+        # Taille totale
+        cursor.execute('''
+            SELECT COALESCE(SUM(v.file_size), 0)
+            FROM volumes v
+            JOIN series s ON v.series_id = s.id
+            WHERE s.library_id = ?
+        ''', (library_id,))
+        total_size = cursor.fetchone()[0]
+
+        # Moyenne de pages
+        cursor.execute('''
+            SELECT COALESCE(AVG(v.page_count), 0)
+            FROM volumes v
+            JOIN series s ON v.series_id = s.id
+            WHERE s.library_id = ? AND v.page_count > 0
+        ''', (library_id,))
+        avg_pages = int(cursor.fetchone()[0])
+
+        conn.close()
 
         return jsonify({
-            'success': True,
-            'cleaned_directories': cleaned_count
+            'total_series': total_series,
+            'total_volumes': total_volumes,
+            'total_size': total_size,
+            'avg_pages': avg_pages
         })
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
-def get_or_create_key():
-    """Génère ou récupère la clé de chiffrement"""
+@app.route('/api/libraries/<int:library_id>')
+def get_library_info(library_id):
+    """Récupère les informations d'une bibliothèque spécifique"""
     try:
-        from cryptography.fernet import Fernet
-        import os
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
 
-        if os.path.exists(KEY_FILE):
-            with open(KEY_FILE, 'rb') as f:
-                return f.read()
-        else:
-            key = Fernet.generate_key()
-            with open(KEY_FILE, 'wb') as f:
-                f.write(key)
-            print(f"✓ Clé de chiffrement générée dans {KEY_FILE}")
-            return key
-    except ImportError:
-        print("⚠️ Module cryptography non installé. Mot de passe non chiffré.")
-        return None
+        cursor.execute('''
+            SELECT id, name, path, description, created_at, last_scanned
+            FROM libraries
+            WHERE id = ?
+        ''', (library_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
 
-def encrypt_password(password):
-    """Chiffre le mot de passe"""
-    if not password:
-        return ''
-    try:
-        from cryptography.fernet import Fernet
-        key = get_or_create_key()
-        if key:
-            f = Fernet(key)
-            return f.encrypt(password.encode()).decode()
-        return password
-    except:
-        return password
+        if not result:
+            return jsonify({'error': 'Bibliothèque introuvable'}), 404
 
-def decrypt_password(encrypted_password):
-    """Déchiffre le mot de passe"""
-    if not encrypted_password:
-        return ''
-    try:
-        from cryptography.fernet import Fernet
-        key = get_or_create_key()
-        if key:
-            f = Fernet(key)
-            return f.decrypt(encrypted_password.encode()).decode()
-        return encrypted_password
-    except:
-        return encrypted_password
+        return jsonify({
+            'id': result[0],
+            'name': result[1],
+            'path': result[2],
+            'description': result[3],
+            'created_at': result[4],
+            'last_scanned': result[5]
+        })
 
-def load_emule_config():
-    """Charge la configuration depuis le fichier JSON"""
-    global EMULE_CONFIG
-    try:
-        import json
-        import os
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f:
-                saved_config = json.load(f)
-                # Déchiffre le mot de passe
-                if 'password' in saved_config:
-                    saved_config['password'] = decrypt_password(saved_config['password'])
-                EMULE_CONFIG.update(saved_config)
-                print(f"✓ Configuration aMule chargée depuis {CONFIG_FILE}")
     except Exception as e:
-        print(f"⚠️ Impossible de charger la config: {e}")
+        return jsonify({'error': str(e)}), 500
 
-def save_emule_config():
-    """Sauvegarde la configuration dans le fichier JSON"""
-    try:
-        import json
-        # Copie de la config avec mot de passe chiffré
-        config_to_save = EMULE_CONFIG.copy()
-        config_to_save['password'] = encrypt_password(EMULE_CONFIG['password'])
-
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(config_to_save, f, indent=4)
-        print(f"✓ Configuration aMule sauvegardée dans {CONFIG_FILE} (mot de passe chiffré)")
-        return True
-    except Exception as e:
-        print(f"✗ Erreur lors de la sauvegarde: {e}")
-        return False
-
-# Charge la config au démarrage
-load_emule_config()
-
-
-@app.route('/search')
-def searchebdz():
-    connection = sqlite3.connect(DB_FILE)
-    cursor = connection.cursor()
-
-    # Compte total des liens
-    cursor.execute("SELECT COUNT(*) FROM ed2k_links")
-    total_links = cursor.fetchone()[0]
-
-    # Compte total des threads uniques
-    cursor.execute("SELECT COUNT(DISTINCT thread_id) FROM ed2k_links")
-    total_threads = cursor.fetchone()[0]
-
-    # Récupère les catégories uniques
-    cursor.execute("SELECT DISTINCT forum_category FROM ed2k_links WHERE forum_category IS NOT NULL")
-    categories = [row[0] for row in cursor.fetchall()]
-
-    connection.close()
-
-    return render_template('search.html', total_links=total_links, total_threads=total_threads, categories=categories)
-
-@app.route('/api/search', methods=['GET'])
-def api_search():
+@app.route('/api/search')
+def search_ed2k():
     query = request.args.get('query', '').strip()
     volume = request.args.get('volume', '').strip()
     category = request.args.get('category', '').strip()
 
-    if not query and not volume and not category:
-        return jsonify({'results': []})
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
 
-    connection = sqlite3.connect(DB_FILE)
-    connection.row_factory = sqlite3.Row
-    cursor = connection.cursor()
+        sql = '''
+            SELECT thread_id, thread_title, thread_url, forum_category, cover_image,
+                   link, filename, filesize, volume, description
+            FROM ed2k_links
+            WHERE 1=1
+        '''
+        params = []
 
-    # Construction de la requête SQL
-    sql = "SELECT * FROM ed2k_links WHERE 1=1"
-    params = []
+        if query:
+            sql += ' AND (thread_title LIKE ? OR filename LIKE ?)'
+            search_term = f'%{query}%'
+            params.extend([search_term, search_term])
 
-    if query:
-        sql += " AND (thread_title LIKE ? OR filename LIKE ?)"
-        params.extend([f'%{query}%', f'%{query}%'])
+        if volume:
+            sql += ' AND volume = ?'
+            params.append(int(volume))
 
-    if volume:
-        sql += " AND volume = ?"
-        params.append(int(volume))
+        if category:
+            sql += ' AND forum_category = ?'
+            params.append(category)
 
-    if category:
-        sql += " AND forum_category = ?"
-        params.append(category)
+        sql += ' ORDER BY thread_id, volume'
 
-    sql += " ORDER BY thread_title, volume"
+        cursor.execute(sql, params)
+        results = cursor.fetchall()
 
-    cursor.execute(sql, params)
-    results = [dict(row) for row in cursor.fetchall()]
+        links = []
+        for row in results:
+            links.append({
+                'thread_id': row[0],
+                'thread_title': row[1],
+                'thread_url': row[2],
+                'forum_category': row[3],
+                'cover_image': row[4],
+                'link': row[5],
+                'filename': row[6],
+                'filesize': row[7],
+                'volume': row[8],
+                'description': row[9]
+            })
 
-    connection.close()
+        conn.close()
 
-    return jsonify({'results': results})
+        return jsonify({'results': links})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/covers/<path:filename>')
 def serve_cover(filename):
-    return send_from_directory('./data/covers', filename)
-
-@app.route('/settings')
-def settings():
-    return render_template('settings.html')
+    """Sert les images de couverture"""
+    covers_dir = os.path.join(os.path.dirname(DB_FILE), 'covers')
+    return send_from_directory(covers_dir, filename)
 
 @app.route('/api/emule/add', methods=['POST'])
-def emule_add_link():
+def emule_add():
     if not EMULE_CONFIG['enabled']:
         return jsonify({'success': False, 'error': 'eMule/aMule non configuré'}), 400
 
     try:
         data = request.get_json()
-        link = data.get('link', '')
+        link = data.get('link')
 
-        if not link.startswith('ed2k://'):
-            return jsonify({'success': False, 'error': 'Lien ED2K invalide'}), 400
+        if not link:
+            return jsonify({'success': False, 'error': 'Lien manquant'}), 400
 
         if EMULE_CONFIG['type'] == 'amule':
             # aMule via amulecmd
-            import subprocess
-
-            print(f"[DEBUG] Tentative d'ajout du lien via amulecmd...")
-            print(f"[DEBUG] Host: {EMULE_CONFIG['host']}, Port EC: {EMULE_CONFIG['ec_port']}")
-
-            cmd = [
-                'amulecmd',
-                '-h', EMULE_CONFIG['host'],
-                '-P', EMULE_CONFIG['password'],
-                '-p', str(EMULE_CONFIG['ec_port']),
-                '-c', f'add {link}'
-            ]
-
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                import subprocess
 
-                print(f"[DEBUG] Return code: {result.returncode}")
-                print(f"[DEBUG] Stdout: {result.stdout[:200]}")
-                print(f"[DEBUG] Stderr: {result.stderr[:200]}")
+                cmd = [
+                    'amulecmd',
+                    '-h', EMULE_CONFIG['host'],
+                    '-P', EMULE_CONFIG['password'],
+                    '-p', str(EMULE_CONFIG['ec_port']),
+                    '-c', f'add {link}'
+                ]
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
                 if result.returncode == 0:
                     return jsonify({'success': True})
                 else:
+                    print(f"[ERROR] {result.stderr}")
                     return jsonify({'success': False, 'error': result.stderr}), 500
 
+            except FileNotFoundError:
+                return jsonify({'success': False, 'error': 'amulecmd introuvable'}), 500
             except subprocess.TimeoutExpired:
                 return jsonify({'success': False, 'error': 'Timeout lors de la connexion à aMule'}), 500
-            except FileNotFoundError:
-                return jsonify({'success': False, 'error': 'amulecmd introuvable. Installez amule-utils'}), 500
             except Exception as e:
                 print(f"[ERROR] {str(e)}")
                 return jsonify({'success': False, 'error': str(e)}), 500

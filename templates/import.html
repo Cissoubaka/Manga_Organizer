@@ -115,6 +115,43 @@
         let allLibraries = [];
         let librariesSeriesMap = {};
 
+        // ===== FONCTION UTILITAIRE POUR NORMALISER LES TITRES =====
+        function normalizeTitle(title) {
+            // Normaliser un titre pour la comparaison
+            return title
+                .toLowerCase()
+                .replace(/[._-]/g, ' ')  // Remplacer points, underscores, tirets par espaces
+                .replace(/\s+/g, ' ')    // Réduire espaces multiples
+                .trim();
+        }
+
+        // ===== FONCTION AMÉLIORÉE POUR TROUVER UNE SÉRIE EXISTANTE =====
+        function findExistingSeries(libraryId, seriesName) {
+            const series = librariesSeriesMap[libraryId] || [];
+            const normalizedInput = normalizeTitle(seriesName);
+            
+            // D'abord chercher une correspondance exacte (normalisée)
+            let match = series.find(s => normalizeTitle(s.title) === normalizedInput);
+            
+            if (match) {
+                return match;
+            }
+            
+            // Sinon, chercher une correspondance partielle forte (>= 90%)
+            let bestMatch = null;
+            let bestScore = 0;
+            
+            for (const s of series) {
+                const score = calculateSimilarity(normalizedInput, normalizeTitle(s.title));
+                if (score >= 90 && score > bestScore) {
+                    bestMatch = s;
+                    bestScore = score;
+                }
+            }
+            
+            return bestMatch;
+        }
+
         async function loadAllLibraries() {
             try {
                 const response = await fetch('/api/libraries');
@@ -211,31 +248,44 @@
                     updateImportStats();
                     displayImportFiles();
                 } else {
-                    alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
-                    resultsSection.style.display = 'none';
+                    container.innerHTML = `
+                        <div class="no-data">
+                            <h3>Erreur</h3>
+                            <p>${data.error || 'Erreur inconnue'}</p>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                alert('❌ Erreur de connexion: ' + error.message);
-                resultsSection.style.display = 'none';
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>Erreur de connexion</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
             }
         }
 
         function updateImportStats() {
             document.getElementById('files-found').textContent = importFiles.length;
             
-            const matched = importFiles.filter(f => f.destination).length;
-            document.getElementById('matches-found').textContent = matched;
-            document.getElementById('unassigned-count').textContent = importFiles.length - matched;
+            const assignedCount = importFiles.filter(f => f.destination).length;
+            document.getElementById('matches-found').textContent = assignedCount;
+            document.getElementById('unassigned-count').textContent = importFiles.length - assignedCount;
             
-            // Activer/désactiver le bouton d'import
-            document.getElementById('import-btn').disabled = matched === 0;
+            const importBtn = document.getElementById('import-btn');
+            importBtn.disabled = assignedCount === 0;
         }
 
         function displayImportFiles() {
             const container = document.getElementById('import-files-container');
             
             if (importFiles.length === 0) {
-                container.innerHTML = '<div class="no-data"><h3>Aucun fichier trouvé</h3><p>Aucun manga trouvé dans ce répertoire</p></div>';
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>Aucun fichier trouvé</h3>
+                        <p>Le répertoire ne contient aucun fichier manga supporté</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -324,7 +374,7 @@
                                     <div class="destination-details">
                                         <strong>${escapeHtml(firstDestination.library_name)}</strong> → 
                                         <strong>${escapeHtml(firstDestination.series_title)}</strong>
-                                        ${firstDestination.is_new_series ? '<span class="badge badge-success">Nouvelle série</span>' : ''}
+                                        ${firstDestination.is_new_series ? '<span class="badge badge-success">Nouvelle série</span>' : '<span class="badge" style="background: #10b981;">Série existante</span>'}
                                     </div>
                                 </div>
                                 <button class="btn btn-danger" onclick="removeGroupDestination('${escapeHtml(seriesTitle)}')">
@@ -339,64 +389,43 @@
                                 const statusClass = hasDestination ? 'assigned' : 'unassigned';
                                 
                                 return `
-                                    <div class="import-file-card ${statusClass}" style="margin: 10px 0;">
-                                        <div class="import-file-header">
-                                            <div class="import-file-icon">📖</div>
-                                            <div class="import-file-info">
-                                                <div class="import-file-name">${escapeHtml(file.filename)}</div>
-                                                <div class="import-file-meta">
-                                                    ${file.parsed.volume ? `<span class="badge">📗 Vol. ${file.parsed.volume}</span>` : ''}
-                                                    ${file.parsed.part_number ? `<span class="badge">🔖 Part ${file.parsed.part_number}</span>` : ''}
-                                                    <span class="badge">💾 ${formatBytes(file.file_size)}</span>
-                                                    <span class="badge">.${file.parsed.format.toUpperCase()}</span>
-                                                </div>
-                                                <div class="import-file-path">${escapeHtml(file.filepath)}</div>
+                                    <div class="import-file-card ${statusClass}">
+                                        <div class="import-file-info">
+                                            <div class="import-file-name" title="${escapeHtml(file.filename)}">
+                                                📄 ${escapeHtml(file.filename)}
                                             </div>
-                                        </div>
-
-                                        ${hasDestination ? `
-                                            <div class="import-file-destination">
-                                                <div class="destination-info">
+                                            <div class="import-file-meta">
+                                                ${file.parsed.volume ? `<span class="badge">Vol. ${file.parsed.volume}</span>` : ''}
+                                                <span class="badge">💾 ${formatBytes(file.file_size)}</span>
+                                                <span class="badge">📁 ${escapeHtml(file.relative_path)}</span>
+                                            </div>
+                                            ${hasDestination ? `
+                                                <div class="import-file-destination">
                                                     <div class="destination-label">📍 Destination:</div>
                                                     <div class="destination-details">
                                                         <strong>${escapeHtml(file.destination.library_name)}</strong> → 
                                                         <strong>${escapeHtml(file.destination.series_title)}</strong>
-                                                        ${file.destination.is_new_series ? '<span class="badge badge-success">Nouvelle série</span>' : ''}
+                                                        ${file.destination.is_new_series ? 
+                                                            '<span class="badge badge-success">Nouvelle série</span>' : 
+                                                            '<span class="badge" style="background: #10b981;">Série existante</span>'}
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div class="import-file-actions">
-                                                <button class="btn" onclick="openDestinationModal(${index})">✏️ Modifier</button>
-                                                <button class="btn btn-danger" onclick="removeDestination(${index})">❌ Retirer</button>
-                                            </div>
-                                        ` : `
-                                            <div class="import-file-quick-assign">
-                                                <div class="quick-assign-header">⚠️ Assigner ce fichier individuellement :</div>
-                                                <div class="quick-assign-form">
-                                                    <div class="quick-assign-row">
-                                                        <label>Bibliothèque:</label>
-                                                        <select id="quick-lib-${index}" class="quick-select" onchange="updateQuickSeriesOptions(${index})">
-                                                            <option value="">-- Sélectionner --</option>
-                                                            ${allLibraries.map(lib => `<option value="${lib.id}">${escapeHtml(lib.name)}</option>`).join('')}
-                                                        </select>
-                                                    </div>
-                                                    <div class="quick-assign-row">
-                                                        <label>Série:</label>
-                                                        <input type="text" 
-                                                               id="quick-series-${index}" 
-                                                               class="quick-input"
-                                                               placeholder="Nom de la série"
-                                                               value="${escapeHtml(file.parsed.title || '')}"
-                                                               list="series-list-${index}">
-                                                        <datalist id="series-list-${index}"></datalist>
-                                                    </div>
-                                                    <div class="quick-assign-row quick-assign-buttons">
-                                                        <button class="btn btn-success" onclick="quickAssign(${index})">✅ Assigner</button>
-                                                        <button class="btn" onclick="openDestinationModal(${index})">⚙️ Options avancées</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        `}
+                                            ` : ''}
+                                        </div>
+                                        <div class="import-file-actions">
+                                            ${!hasDestination ? `
+                                                <button class="btn" onclick="openDestinationModal(${index})">
+                                                    📌 Assigner
+                                                </button>
+                                            ` : `
+                                                <button class="btn" onclick="openDestinationModal(${index})">
+                                                    ✏️ Modifier
+                                                </button>
+                                                <button class="btn btn-danger" onclick="removeDestination(${index})">
+                                                    ❌
+                                                </button>
+                                            `}
+                                        </div>
                                     </div>
                                 `;
                             }).join('')}
@@ -404,20 +433,20 @@
                     </div>
                 `;
             }).join('');
-            
+
             container.innerHTML = groupsHtml;
         }
 
         function toggleGroup(groupId) {
             const group = document.getElementById(groupId);
-            const isHidden = group.style.display === 'none';
-            group.style.display = isHidden ? 'block' : 'none';
+            const toggle = event.currentTarget.querySelector('.group-toggle');
             
-            // Changer l'icône de toggle
-            const header = group.previousElementSibling;
-            const toggle = header?.querySelector('.group-toggle');
-            if (toggle) {
-                toggle.textContent = isHidden ? '▼' : '▶';
+            if (group.style.display === 'none') {
+                group.style.display = 'block';
+                toggle.textContent = '▲';
+            } else {
+                group.style.display = 'none';
+                toggle.textContent = '▼';
             }
         }
 
@@ -450,11 +479,13 @@
             }
             
             const library = allLibraries.find(l => l.id === libraryId);
-            const series = librariesSeriesMap[libraryId] || [];
-            const existingSeries = series.find(s => s.title.toLowerCase() === seriesName.toLowerCase());
+            
+            // ===== UTILISATION DE LA FONCTION AMÉLIORÉE =====
+            const existingSeries = findExistingSeries(libraryId, seriesName);
             
             let destination;
             if (existingSeries) {
+                console.log(`✅ Série existante trouvée: "${existingSeries.title}" (ID: ${existingSeries.id})`);
                 destination = {
                     library_id: libraryId,
                     library_name: library.name,
@@ -464,6 +495,7 @@
                     is_new_series: false
                 };
             } else {
+                console.log(`➕ Nouvelle série: "${seriesName}"`);
                 destination = {
                     library_id: libraryId,
                     library_name: library.name,
@@ -483,7 +515,7 @@
                 }
             });
             
-            alert(`✅ ${assignedCount} fichier(s) assigné(s) à "${seriesName}"`);
+            alert(`✅ ${assignedCount} fichier(s) assigné(s) à "${seriesName}"${existingSeries ? ' (série existante)' : ' (nouvelle série)'}`);
             updateImportStats();
             displayImportFiles();
         }
@@ -531,8 +563,9 @@
             }
             
             const library = allLibraries.find(l => l.id === libraryId);
-            const series = librariesSeriesMap[libraryId] || [];
-            const existingSeries = series.find(s => s.title.toLowerCase() === seriesName.toLowerCase());
+            
+            // ===== UTILISATION DE LA FONCTION AMÉLIORÉE =====
+            const existingSeries = findExistingSeries(libraryId, seriesName);
             
             if (existingSeries) {
                 // Série existante
@@ -677,26 +710,14 @@
             displayImportFiles();
         }
 
-        function normalizeTitle(title) {
-            // Normaliser un titre pour la comparaison
-            return title
-                .toLowerCase()
-                .replace(/[._-]/g, ' ')  // Remplacer points, underscores, tirets par espaces
-                .replace(/\s+/g, ' ')    // Réduire espaces multiples
-                .trim();
-        }
-
         function calculateSimilarity(str1, str2) {
-            // Calculer la similarité entre deux chaînes (algorithme de Levenshtein simplifié)
-            const longer = str1.length > str2.length ? str1 : str2;
-            const shorter = str1.length > str2.length ? str2 : str1;
-            
-            if (longer.length === 0) return 1.0;
-            
-            // Correspondance exacte
+            // Calculer la similarité entre deux chaînes
             if (str1 === str2) return 100;
             
-            // Inclusion complète
+            // Si une chaîne contient l'autre
+            const shorter = str1.length < str2.length ? str1 : str2;
+            const longer = str1.length >= str2.length ? str1 : str2;
+            
             if (longer.includes(shorter)) {
                 return (shorter.length / longer.length) * 90;
             }

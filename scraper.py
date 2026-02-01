@@ -396,57 +396,103 @@ class MyBBScraper:
         print("\n=== Scraping terminé ===")
 
 
-# Configuration
+def load_config_from_json(config_path):
+    """
+    Charge la configuration depuis ebdz_config.json (fichier partagé avec l'appli web).
+    Déchiffre le mot de passe avec Fernet si la clé existe, sinon utilise la valeur telle quelle.
+    Retourne un dict : { 'username', 'password', 'forums': [...] }
+    """
+    import json
+
+    if not os.path.exists(config_path):
+        print(f"✗ Fichier de config introuvable : {config_path}")
+        print("  → Lancez d'abord l'appli web et configurez les identifiants dans Settings > ebdz.net")
+        return None
+
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
+    # Déchiffrement du mot de passe (même logique que app.py)
+    encrypted_password = config.get('password', '')
+    key_file = os.path.join(os.path.dirname(config_path), '.emule_key')
+
+    if encrypted_password and os.path.exists(key_file):
+        try:
+            from cryptography.fernet import Fernet
+            with open(key_file, 'rb') as kf:
+                key = kf.read()
+            config['password'] = Fernet(key).decrypt(encrypted_password.encode()).decode()
+        except Exception as e:
+            print(f"⚠️  Impossible de déchiffrer le mot de passe : {e}")
+            print("    → Le mot de passe sera utilisé tel quel (peut être incorrect)")
+    
+    return config
+
+
 if __name__ == "__main__":
-    # Fichier de base de données SQLite dans ./data
     DB_FILE = "./data/ebdz.db"
-    
-    # Créer le répertoire data si nécessaire
+    CONFIG_PATH = "./data/ebdz_config.json"
+
     os.makedirs('./data', exist_ok=True)
-    
-    # Identifiants forum - À PERSONNALISER
-    USERNAME = ""
-    PASSWORD = ""
-   
-    # ======= CONFIGURATION DES FORUMS À SCRAPER =======
-    # Change facilement l'URL et le nom de catégorie ici
-    
-    FORUMS_TO_SCRAPE = [
-        {
-            'url': 'https://ebdz.net/forum/forumdisplay.php?fid=29',
-            'category': 'Mangas',  # Nom pour identifier cette catégorie
-            'max_pages': 71  # Limite de pages (None pour tout scraper)
-        },
-        # Ajoute d'autres forums ici :
-        # {
-        #     'url': 'https://ebdz.net/forum/forumdisplay.php?fid=30',
-        #     'category': 'Films',
-        #     'max_pages': None
-        # },
-    ]
-    
-    # ================================================
-    
+
+    # ─── Chargement de la config depuis le fichier partagé ───
+    config = load_config_from_json(CONFIG_PATH)
+
+    if not config:
+        exit(1)
+
+    USERNAME = config.get('username', '').strip()
+    PASSWORD = config.get('password', '').strip()
+    forums_raw = config.get('forums', [])
+
+    if not USERNAME or not PASSWORD:
+        print("✗ Identifiants manquants dans la config.")
+        print("  → Configurez-les dans l'appli web : Settings > ebdz.net")
+        exit(1)
+
+    if not forums_raw:
+        print("✗ Aucun forum configuré.")
+        print("  → Ajoutez des forums dans l'appli web : Settings > ebdz.net")
+        exit(1)
+
+    # Reconstruction de FORUMS_TO_SCRAPE depuis les fid
+    FORUMS_TO_SCRAPE = []
+    for f in forums_raw:
+        fid = f.get('fid')
+        if fid is None:
+            continue
+        FORUMS_TO_SCRAPE.append({
+            'url': f"https://ebdz.net/forum/forumdisplay.php?fid={fid}",
+            'category': f.get('category', f'Forum {fid}'),
+            'max_pages': f.get('max_pages')  # None = pas de limite
+        })
+
+    # ─── Lancement ───
     print("\n" + "=" * 60)
     print("🚀 SCRAPER ED2K - EmuleBDZ")
+    print(f"   Config depuis : {CONFIG_PATH}")
+    print(f"   Utilisateur   : {USERNAME}")
+    print(f"   Forums        : {len(FORUMS_TO_SCRAPE)}")
     print("=" * 60)
-    
+
     for forum_config in FORUMS_TO_SCRAPE:
         print(f"\n📂 Catégorie : {forum_config['category']}")
         print(f"🔗 URL : {forum_config['url']}")
-        
+        if forum_config['max_pages']:
+            print(f"📄 Max pages : {forum_config['max_pages']}")
+
         scraper = MyBBScraper(
-            forum_config['url'], 
-            DB_FILE, 
-            USERNAME, 
+            forum_config['url'],
+            DB_FILE,
+            USERNAME,
             PASSWORD,
             forum_config['category']
         )
-        
+
         scraper.run(max_pages=forum_config['max_pages'])
-        
+
         print("\n" + "-" * 60)
-    
+
     print("\n✅ Scraping terminé pour toutes les catégories !")
-    print("=" * 60) 
+    print("=" * 60)
     

@@ -318,8 +318,110 @@
     color: #667eea;
 }
 
+/* ===== Styles forum rows ebdz.net ===== */
+.forum-row {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 18px 20px 16px;
+    margin-bottom: 14px;
+    transition: border-color 0.3s;
+}
+
+.forum-row:hover {
+    border-color: #667eea;
+}
+
+.forum-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.forum-row-label {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 0.95em;
+}
+
+.btn-remove-forum {
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    line-height: 28px;
+    text-align: center;
+    transition: background 0.2s;
+}
+
+.btn-remove-forum:hover {
+    background: #c82333;
+}
+
+.forum-row-fields {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.forum-row-fields .form-group {
+    margin-bottom: 0;
+}
+
+.select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #667eea;
+    cursor: pointer;
+    user-select: none;
+}
+
+.select-all-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.forum-row .forum-select {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.forum-row:not(.forum-selected) {
+    opacity: 0.55;
+}
+
+.no-forums-placeholder {
+    text-align: center;
+    padding: 28px 20px;
+    color: #888;
+    font-size: 0.95em;
+    border: 2px dashed #ddd;
+    border-radius: 10px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+    .forum-row-fields {
+        flex-direction: column;
+    }
+
+    .forum-row-fields .form-group {
+        flex: 1 !important;
+    }
+
     .settings-tabs {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;

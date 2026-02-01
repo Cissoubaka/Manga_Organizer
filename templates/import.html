@@ -26,7 +26,6 @@
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" id="import-path" class="import-path-input" 
                                placeholder="/chemin/vers/dossier/import">
-                        <button type="button" class="btn" onclick="browseImportPath()">📁 Parcourir</button>
                         <button type="button" class="btn btn-success" onclick="scanImportDirectory()">🔍 Scanner</button>
                     </div>
                     <input type="file" id="import-folder-browser" webkitdirectory directory multiple 
@@ -167,9 +166,6 @@
             }
         }
 
-        function browseImportPath() {
-            document.getElementById('import-folder-browser').click();
-        }
 
         function handleImportFolderSelect(event) {
             const files = event.target.files;

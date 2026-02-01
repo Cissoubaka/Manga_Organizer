@@ -26,6 +26,7 @@ DATABASE = './data/manga_library.db'
 DB_FILE = "./data/ebdz.db"
 CONFIG_FILE = "./data/emule_config.json"
 KEY_FILE = "./data/.emule_key"
+EBDZ_CONFIG_FILE = "./data/ebdz_config.json"
 
 # Créer les répertoires nécessaires
 os.makedirs('./data/covers', exist_ok=True)
@@ -43,6 +44,14 @@ EMULE_CONFIG = {
     'port': 4711,  # Port interface web (non utilisé pour amule EC)
     'ec_port': 4712,  # Port External Connections pour aMule
     'password': ''  # Mot de passe admin / EC
+}
+
+# Configuration du scraper ebdz.net
+EBDZ_CONFIG = {
+    'username': '',
+    'password': '',
+    'forums': []
+    # Chaque forum : { 'fid': int, 'category': str, 'max_pages': int|None }
 }
 
 class LibraryScanner:
@@ -615,7 +624,37 @@ def save_emule_config():
 load_emule_config()
 
 
-# ROUTES WEB
+# ─── Config ebdz.net ────────────────────────────────────────
+
+def load_ebdz_config():
+    """Charge la configuration du scraper ebdz depuis le fichier JSON"""
+    global EBDZ_CONFIG
+    try:
+        if os.path.exists(EBDZ_CONFIG_FILE):
+            with open(EBDZ_CONFIG_FILE, 'r') as f:
+                saved = json.load(f)
+                # Déchiffre le mot de passe
+                if 'password' in saved:
+                    saved['password'] = decrypt_password(saved['password'])
+                EBDZ_CONFIG.update(saved)
+                print(f"✓ Configuration ebdz.net chargée depuis {EBDZ_CONFIG_FILE}")
+    except Exception as e:
+        print(f"⚠️ Impossible de charger la config ebdz: {e}")
+
+def save_ebdz_config():
+    """Sauvegarde la configuration du scraper ebdz dans le fichier JSON"""
+    try:
+        config_to_save = EBDZ_CONFIG.copy()
+        config_to_save['password'] = encrypt_password(EBDZ_CONFIG['password'])
+        with open(EBDZ_CONFIG_FILE, 'w') as f:
+            json.dump(config_to_save, f, indent=4, ensure_ascii=False)
+        print(f"✓ Configuration ebdz.net sauvegardée dans {EBDZ_CONFIG_FILE}")
+        return True
+    except Exception as e:
+        print(f"✗ Erreur sauvegarde config ebdz: {e}")
+        return False
+
+load_ebdz_config()
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1667,6 +1706,131 @@ def emule_test():
     except FileNotFoundError:
         return jsonify({'success': False, 'error': 'amulecmd introuvable. Installez amule-utils'}), 500
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ─── API ebdz.net ────────────────────────────────────────────
+
+@app.route('/api/ebdz/config', methods=['GET', 'POST'])
+def ebdz_config():
+    global EBDZ_CONFIG
+
+    if request.method == 'GET':
+        return jsonify({
+            'username': EBDZ_CONFIG.get('username', ''),
+            'password': '****' if EBDZ_CONFIG.get('password') else '',
+            'forums': EBDZ_CONFIG.get('forums', [])
+        })
+    else:
+        try:
+            data = request.get_json()
+
+            EBDZ_CONFIG['username'] = data.get('username', '').strip()
+
+            # Ne met à jour le mot de passe que s'il n'est pas masqué
+            new_password = data.get('password', '')
+            if new_password and new_password != '****':
+                EBDZ_CONFIG['password'] = new_password
+
+            # Validation et nettoyage des forums
+            forums = []
+            for f in data.get('forums', []):
+                fid = f.get('fid')
+                if fid is None:
+                    continue
+                forums.append({
+                    'fid': int(fid),
+                    'category': f.get('category', '').strip() or f'Forum {fid}',
+                    'max_pages': int(f['max_pages']) if f.get('max_pages') else None
+                })
+            EBDZ_CONFIG['forums'] = forums
+
+            if save_ebdz_config():
+                return jsonify({'success': True, 'message': 'Configuration ebdz.net sauvegardée'})
+            else:
+                return jsonify({'success': False, 'error': 'Erreur lors de la sauvegarde'}), 500
+
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/ebdz/scrape', methods=['POST'])
+def ebdz_scrape():
+    """Lance le scraper ebdz.net avec la config actuelle.
+    Le body JSON peut contenir 'fids': liste de fid à scraper.
+    Si absent ou vide, tous les forums configurés sont scrapés.
+    """
+    try:
+        username = EBDZ_CONFIG.get('username', '')
+        password = EBDZ_CONFIG.get('password', '')
+        all_forums = EBDZ_CONFIG.get('forums', [])
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Identifiants non configurés'}), 400
+
+        if not all_forums:
+            return jsonify({'success': False, 'error': 'Aucun forum configuré'}), 400
+
+        # Filtrer par les fid envoyés depuis le front (si présents)
+        data = request.get_json(silent=True) or {}
+        requested_fids = data.get('fids', [])
+
+        if requested_fids:
+            forums = [f for f in all_forums if f.get('fid') in requested_fids]
+            if not forums:
+                return jsonify({'success': False, 'error': 'Aucun forum correspondant aux fid envoyés'}), 400
+        else:
+            forums = all_forums
+
+        # Import dynamique du scraper
+        import importlib.util
+        scraper_path = os.path.join(os.path.dirname(__file__), 'scraper.py')
+        if not os.path.exists(scraper_path):
+            return jsonify({'success': False, 'error': 'scraper.py introuvable dans le répertoire du projet'}), 500
+
+        spec = importlib.util.spec_from_file_location("scraper", scraper_path)
+        scraper_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scraper_module)
+
+        total_links = 0
+        forums_scraped = 0
+
+        for forum_cfg in forums:
+            fid = forum_cfg['fid']
+            category = forum_cfg['category']
+            max_pages = forum_cfg.get('max_pages')
+
+            forum_url = f"https://ebdz.net/forum/forumdisplay.php?fid={fid}"
+
+            print(f"\n📂 Scraping forum fid={fid} catégorie='{category}'...")
+
+            scraper = scraper_module.MyBBScraper(
+                base_url=forum_url,
+                db_file=DB_FILE,
+                username=username,
+                password=password,
+                forum_category=category
+            )
+
+            scraper.run(max_pages=max_pages)
+            forums_scraped += 1
+
+            # Compter les liens pour cette catégorie
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM ed2k_links WHERE forum_category = ?', (category,))
+            total_links += cursor.fetchone()[0]
+            conn.close()
+
+        return jsonify({
+            'success': True,
+            'forums_scraped': forums_scraped,
+            'total_links': total_links
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

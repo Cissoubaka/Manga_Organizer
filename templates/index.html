@@ -59,7 +59,6 @@
                     <label for="library-path">Chemin du dossier *</label>
                     <div style="display: flex; gap: 10px;">
                         <input type="text" id="library-path" required placeholder="/chemin/vers/mes/mangas" style="flex: 1;">
-                        <button type="button" class="btn" onclick="browsePath()" style="white-space: nowrap;">📁 Parcourir</button>
                     </div>
                     <input type="file" id="folder-browser" webkitdirectory directory multiple style="display: none;" onchange="handleFolderSelect(event)">
                     <small style="color: #666; font-size: 0.85em;">Le chemin complet vers votre dossier de mangas</small>
@@ -248,10 +247,7 @@
             }
         }
 
-        function browsePath() {
-            document.getElementById('folder-browser').click();
-        }
-
+        
         function handleFolderSelect(event) {
             const files = event.target.files;
             if (files.length > 0) {

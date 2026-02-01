@@ -6,18 +6,28 @@ Permet de gerer sa collection de manga, importation, volumes manquants,.....
 - module python : voir le fichier requirement.txt :
   ```pip install -r requirements.txt```
 
-## app.py
-- ajouter des bibliothèques de mangas,
-- importer des nouveaux mangas dans les series deja dispo (remplacement si taille plus grande) ou de nouvelle serie (choix de la bibliotèque)
-- afficher les volumes manquants dans les séries et les rechercher directement
-- rechercher les séries/volumes dans la base de données obtenu par scraper.py
-- configuration de amule directement sur la page web
-- ajouter des volumes a télécharger directement dans aMule
+## Fonctionnement
+#### Bibliothèque
+- Ajouter une biliothèque,
+- Scanner une bibliothèque
+- Ouvrir la bibliothèque, pour consulter les séries
+- Cliquer sur une série pour voir les volumes possédés, les manquants (en cliquant sur le volume manquant, cela cherche dans la base de données ebdz.net si configuré)
+  
+#### Import
+A faire apres avoir au moins créer et scanner une bibliothèque
+- choisir un chemin d'import,
+- scanner le chemin
+- cliquer sur auto-assigner
+- modifier les assignation auto
+- cliquer sur importer les fichiers assignés
 
-## scraper.py
-- permet de scraper les liens ed2k du forum ebdz.net dans une base de données avec covers et descriptions pour la plupart des mangas.
-- configuration du scraper dans la page configuration
+#### Recherche
+- rechercher dans la base de données de liens ed2k de ebdz.net
+- cliquer sur ajouter permet d'envoyer directement a amule si amulecmd est installé, et si aMule est configuré 
 
-### Correction a venir
-- détection correcte des volumes par scraper.py (beaucoup de cas particulier du a un formalisme totalement absent)
-- il faut rescanner la bibliotheque apres l'import de nouveaux volumes/séries
+#### Configuration
+- configuration de aMule
+- configuration des identifiants de ebdz.net et des sous-forums a scraper
+- lancer le scrap des forums sélectionnés
+
+

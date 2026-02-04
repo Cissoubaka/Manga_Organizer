@@ -8,7 +8,7 @@ Permet de gerer sa collection de manga, importation, volumes manquants,.....
 
 ## Fonctionnement
 #### Bibliothèque
-- Ajouter une biliothèque,
+- Ajouter une bibliothèque,
 - Scanner une bibliothèque
 - Ouvrir la bibliothèque, pour consulter les séries
 - Cliquer sur une série pour voir les volumes possédés, les manquants (en cliquant sur le volume manquant, cela cherche dans la base de données ebdz.net si configuré)
@@ -22,6 +22,7 @@ A faire apres avoir au moins créer et scanner une bibliothèque
 - cliquer sur importer les fichiers assignés
 
 #### Recherche
+A faire uniquement après avoir rentrer ses identifiants du forum ebdz.net, et au moins avoir ajouter un sous-forum à scraper
 - rechercher dans la base de données de liens ed2k de ebdz.net
 - cliquer sur ajouter permet d'envoyer directement a amule si amulecmd est installé, et si aMule est configuré 
 

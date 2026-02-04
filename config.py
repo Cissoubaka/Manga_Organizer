@@ -43,9 +43,73 @@ class Config:
     
     @staticmethod
     def init_app(app):
-        """Initialise les répertoires nécessaires"""
+        """Initialise les répertoires et la base de données"""
         os.makedirs(Config.DATA_DIR, exist_ok=True)
         os.makedirs(Config.COVERS_DIR, exist_ok=True)
+        
+        # Initialiser la base de données si elle n'existe pas
+        Config._init_database(Config.DATABASE)
+    
+    @staticmethod
+    def _init_database(db_path):
+        """Initialise les tables de la base de données SQLite"""
+        import sqlite3
+        
+        conn = sqlite3.connect(db_path, timeout=30.0)
+        cursor = conn.cursor()
+        
+        # Activer le mode WAL (Write-Ahead Logging) pour de meilleures performances concurrentes
+        cursor.execute('PRAGMA journal_mode=WAL')
+        
+        # Table des bibliothèques
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS libraries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                path TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_scanned TIMESTAMP
+            )
+        ''')
+        
+        # Table des séries
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS series (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                library_id INTEGER,
+                title TEXT NOT NULL,
+                path TEXT,
+                total_volumes INTEGER,
+                missing_volumes TEXT,
+                has_parts INTEGER DEFAULT 0,
+                last_scanned TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Table des volumes
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS volumes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                series_id INTEGER,
+                part_number INTEGER,
+                part_name TEXT,
+                volume_number INTEGER,
+                filename TEXT,
+                filepath TEXT,
+                author TEXT,
+                year INTEGER,
+                resolution TEXT,
+                file_size INTEGER,
+                page_count INTEGER,
+                format TEXT,
+                FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
 
 
 class DevelopmentConfig(Config):

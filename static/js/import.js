@@ -1,3 +1,4 @@
+console.log('import.js chargé');
 let importFiles = [];
 let currentFileIndex = -1;
 let allLibraries = [];
@@ -163,7 +164,7 @@ function updateImportStats() {
 
 function displayImportFiles() {
     const container = document.getElementById('import-files-container');
-    
+
     if (importFiles.length === 0) {
         container.innerHTML = `
             <div class="no-data">
@@ -189,24 +190,33 @@ function displayImportFiles() {
         const allAssigned = items.every(item => item.file.destination);
         const someAssigned = items.some(item => item.file.destination);
         const noneAssigned = !someAssigned;
-        
+
         let groupStatusClass = 'group-mixed';
         if (allAssigned) groupStatusClass = 'group-assigned';
         else if (noneAssigned) groupStatusClass = 'group-unassigned';
 
         const totalSize = items.reduce((sum, item) => sum + item.file.file_size, 0);
         const volumes = items.map(item => item.file.parsed.volume).filter(v => v).sort((a, b) => a - b);
-        
+
+        // Générer des identifiants sûrs
+        const idSuffix = seriesTitle.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+        const safeGroupId = `group-${idSuffix}`;
+        // JSON.stringify may include unicode line separators U+2028/U+2029 which break
+        // inline JS string literals in some browsers. Escape them explicitly.
+        const safeJsTitle = JSON.stringify(seriesTitle)
+            .replace(/\u2028/g, '\\u2028')
+            .replace(/\u2029/g, '\\u2029');
+
         // Vérifier si tous les fichiers du groupe ont la même destination
         const firstDestination = items.find(item => item.file.destination)?.file.destination;
-        const sameDestination = allAssigned && items.every(item => 
+        const sameDestination = allAssigned && items.every(item =>
             item.file.destination?.library_id === firstDestination?.library_id &&
             item.file.destination?.series_title === firstDestination?.series_title
         );
 
         return `
             <div class="import-group ${groupStatusClass}">
-                <div class="import-group-header" onclick="toggleGroup('group-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}')">
+                <div class="import-group-header" onclick="toggleGroup(this,'${safeGroupId}')">
                     <div class="import-group-info">
                         <div class="import-group-title">
                             <span class="group-toggle">▼</span>
@@ -216,7 +226,7 @@ function displayImportFiles() {
                             <span class="badge">${items.length} fichier${items.length > 1 ? 's' : ''}</span>
                             ${volumes.length > 0 ? `<span class="badge">📗 Vol. ${volumes.join(', ')}</span>` : ''}
                             <span class="badge">💾 ${formatBytes(totalSize)}</span>
-                            ${allAssigned ? '<span class="badge badge-success">✅ Tous assignés</span>' : 
+                            ${allAssigned ? '<span class="badge badge-success">✅ Tous assignés</span>' :
                                 someAssigned ? '<span class="badge" style="background: #fbbf24;">⚠️ Partiellement assigné</span>' :
                                 '<span class="badge" style="background: #f87171; color: white;">❌ Non assigné</span>'}
                         </div>
@@ -229,24 +239,24 @@ function displayImportFiles() {
                         <div class="quick-assign-form">
                             <div class="quick-assign-row">
                                 <label>Bibliothèque:</label>
-                                <select id="group-lib-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}" class="quick-select" 
-                                        onchange="updateGroupSeriesOptions('${escapeHtml(seriesTitle).replace(/\s+/g, '-')}')">
+                                <select id="group-lib-${idSuffix}" class="quick-select"
+                                        onchange="updateGroupSeriesOptions('${idSuffix}')">
                                     <option value="">-- Sélectionner --</option>
                                     ${allLibraries.map(lib => `<option value="${lib.id}">${escapeHtml(lib.name)}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="quick-assign-row">
                                 <label>Série:</label>
-                                <input type="text" 
-                                        id="group-series-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}" 
+                                <input type="text"
+                                        id="group-series-${idSuffix}"
                                         class="quick-input"
                                         placeholder="Nom de la série"
                                         value="${escapeHtml(seriesTitle)}"
-                                        list="group-series-list-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}">
-                                <datalist id="group-series-list-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}"></datalist>
+                                        list="group-series-list-${idSuffix}">
+                                <datalist id="group-series-list-${idSuffix}"></datalist>
                             </div>
                             <div class="quick-assign-row quick-assign-buttons">
-                                <button class="btn btn-success" onclick="quickAssignGroup('${escapeHtml(seriesTitle)}')">
+                                <button class="btn btn-success quick-assign-btn" data-series-title="${encodeURIComponent(seriesTitle)}">
                                     ✅ Assigner tous (${items.filter(item => !item.file.destination).length} fichier${items.filter(item => !item.file.destination).length > 1 ? 's' : ''})
                                 </button>
                             </div>
@@ -257,22 +267,22 @@ function displayImportFiles() {
                         <div class="destination-info">
                             <div class="destination-label">📍 Destination commune:</div>
                             <div class="destination-details">
-                                <strong>${escapeHtml(firstDestination.library_name)}</strong> → 
+                                <strong>${escapeHtml(firstDestination.library_name)}</strong> →
                                 <strong>${escapeHtml(firstDestination.series_title)}</strong>
                                 ${firstDestination.is_new_series ? '<span class="badge badge-success">Nouvelle série</span>' : '<span class="badge" style="background: #10b981;">Série existante</span>'}
                             </div>
                         </div>
-                        <button class="btn btn-danger" onclick="removeGroupDestination('${escapeHtml(seriesTitle)}')">
+                        <button class="btn btn-danger remove-group-btn" data-series-title="${encodeURIComponent(seriesTitle)}">
                             ❌ Retirer tous
                         </button>
                     </div>
                 ` : ''}
 
-                <div class="import-group-files" id="group-${escapeHtml(seriesTitle).replace(/\s+/g, '-')}" style="display: none;">
+                <div class="import-group-files" id="${safeGroupId}" style="display: none;">
                     ${items.map(({ file, index }) => {
                         const hasDestination = file.destination;
                         const statusClass = hasDestination ? 'assigned' : 'unassigned';
-                        
+
                         return `
                             <div class="import-file-card ${statusClass}">
                                 <div class="import-file-info">
@@ -288,10 +298,10 @@ function displayImportFiles() {
                                         <div class="import-file-destination">
                                             <div class="destination-label">📍 Destination:</div>
                                             <div class="destination-details">
-                                                <strong>${escapeHtml(file.destination.library_name)}</strong> → 
+                                                <strong>${escapeHtml(file.destination.library_name)}</strong> →
                                                 <strong>${escapeHtml(file.destination.series_title)}</strong>
-                                                ${file.destination.is_new_series ? 
-                                                    '<span class="badge badge-success">Nouvelle série</span>' : 
+                                                ${file.destination.is_new_series ?
+                                                    '<span class="badge badge-success">Nouvelle série</span>' :
                                                     '<span class="badge" style="background: #10b981;">Série existante</span>'}
                                             </div>
                                         </div>
@@ -320,12 +330,27 @@ function displayImportFiles() {
     }).join('');
 
     container.innerHTML = groupsHtml;
+
+    // Attacher les écouteurs aux boutons créés dynamiquement (évite les handlers inline)
+    container.querySelectorAll('.quick-assign-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const title = decodeURIComponent(btn.getAttribute('data-series-title'));
+            quickAssignGroup(title);
+        });
+    });
+
+    container.querySelectorAll('.remove-group-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const title = decodeURIComponent(btn.getAttribute('data-series-title'));
+            removeGroupDestination(title);
+        });
+    });
 }
 
-function toggleGroup(groupId) {
+function toggleGroup(el, groupId) {
     const group = document.getElementById(groupId);
-    const toggle = event.currentTarget.querySelector('.group-toggle');
-    
+    const toggle = el.querySelector('.group-toggle');
+
     if (group.style.display === 'none') {
         group.style.display = 'block';
         toggle.textContent = '▲';
@@ -349,7 +374,7 @@ function updateGroupSeriesOptions(groupKey) {
 }
 
 function quickAssignGroup(seriesTitle) {
-    const groupKey = seriesTitle.replace(/\s+/g, '-');
+    const groupKey = seriesTitle.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
     const libraryId = parseInt(document.getElementById(`group-lib-${groupKey}`).value);
     const seriesName = document.getElementById(`group-series-${groupKey}`).value.trim();
     
@@ -410,6 +435,7 @@ function removeGroupDestination(seriesTitle) {
         return;
     }
     
+    const groupKey = seriesTitle.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
     importFiles.forEach((file, index) => {
         if ((file.parsed.title || 'Sans titre') === seriesTitle) {
             delete importFiles[index].destination;
@@ -479,6 +505,7 @@ function quickAssign(fileIndex) {
 }
 
 function openDestinationModal(fileIndex) {
+    console.debug('openDestinationModal called with index=', fileIndex);
     currentFileIndex = fileIndex;
     const file = importFiles[fileIndex];
     
@@ -542,6 +569,7 @@ function loadLibrarySeries() {
 }
 
 function assignDestination() {
+    console.debug('assignDestination called, currentFileIndex=', currentFileIndex);
     const libraryId = parseInt(document.getElementById('destination-library').value);
     const seriesValue = document.getElementById('destination-series').value;
     
@@ -550,7 +578,12 @@ function assignDestination() {
         return;
     }
     
-    const library = allLibraries.find(l => l.id === libraryId);
+    let library = allLibraries.find(l => l.id === libraryId);
+    if (!library) {
+        // tolerate string ids
+        library = allLibraries.find(l => parseInt(l.id) === libraryId);
+    }
+    console.debug('assignDestination: libraryId=', libraryId, 'seriesValue=', seriesValue, 'library=', library);
     let destination;
     
     if (seriesValue === '__new__') {
@@ -570,8 +603,15 @@ function assignDestination() {
         };
     } else {
         const seriesId = parseInt(seriesValue);
-        const series = librariesSeriesMap[libraryId].find(s => s.id === seriesId);
-        
+        const seriesList = librariesSeriesMap[libraryId] || librariesSeriesMap[String(libraryId)] || [];
+        const series = seriesList.find(s => parseInt(s.id) === seriesId);
+
+        if (!series) {
+            alert('⚠️ Série introuvable dans la bibliothèque sélectionnée. Vérifiez la bibliothèque choisie.');
+            console.warn('assignDestination: series not found', { libraryId, seriesId, seriesList });
+            return;
+        }
+
         destination = {
             library_id: libraryId,
             library_name: library.name,

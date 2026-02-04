@@ -1,8 +1,9 @@
-Flask==3.0.0
-Pillow==10.1.0
+Flask==3.1.2
+Pillow==12.1.0
 PyPDF2==3.0.1
 rarfile==4.1
 ebooklib==0.18
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
+cryptography==41.0.4

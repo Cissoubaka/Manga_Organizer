@@ -204,12 +204,12 @@ async function viewSeries(seriesId) {
                         <h3 class="missing-volumes-title">⚠️ Volumes manquants</h3>
                         <div class="missing-volumes-grid">
                             ${data.missing_volumes.map(volNum => `
-                                <div class="missing-volume-card" onclick="searchMissingVolume('${escapeHtml(data.title)}', ${volNum}); event.stopPropagation();" style="cursor: pointer;">
-                                    <div class="missing-volume-number">${volNum}</div>
-                                    <div class="missing-volume-label">Vol. ${volNum}</div>
-                                    <div style="font-size: 0.7em; color: #667eea; margin-top: 5px;">🔍 Rechercher</div>
-                                </div>
-                            `).join('')}
+                                    <div class="missing-volume-card" data-series-title="${encodeURIComponent(data.title)}" data-volume-number="${volNum}" style="cursor: pointer;">
+                                        <div class="missing-volume-number">${volNum}</div>
+                                        <div class="missing-volume-label">Vol. ${volNum}</div>
+                                        <div style="font-size: 0.7em; color: #667eea; margin-top: 5px;">🔍 Rechercher</div>
+                                    </div>
+                                `).join('')}
                         </div>
                     </div>` : 
                     `<div class="complete" style="margin-top: 15px;">
@@ -219,12 +219,22 @@ async function viewSeries(seriesId) {
             </div>
             ${volumesHtml}
         `;
+        // Attacher écouteurs aux cartes de volumes manquants pour éviter les handlers inline
+        modalBody.querySelectorAll('.missing-volume-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const title = decodeURIComponent(card.getAttribute('data-series-title'));
+                const vol = parseInt(card.getAttribute('data-volume-number'));
+                searchMissingVolume(title, vol);
+            });
+        });
     } catch (error) {
         modalBody.innerHTML = `<div class="no-data"><h3>Erreur</h3><p>${error.message}</p></div>`;
     }
 }
 
 async function searchMissingVolume(seriesTitle, volumeNumber) {
+    console.debug('searchMissingVolume called', { seriesTitle, volumeNumber });
     const searchModal = document.getElementById('search-ed2k-modal');
     const searchModalBody = document.getElementById('search-modal-body');
     
@@ -236,8 +246,10 @@ async function searchMissingVolume(seriesTitle, volumeNumber) {
         params.append('query', seriesTitle);
         params.append('volume', volumeNumber);
 
+        console.debug('searchMissingVolume: fetching', `/api/search?${params}`);
         const response = await fetch(`/api/search?${params}`);
         const data = await response.json();
+        console.debug('searchMissingVolume: response', data);
 
         if (data.results && data.results.length > 0) {
             displaySearchResults(seriesTitle, volumeNumber, data.results);

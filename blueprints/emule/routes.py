@@ -10,7 +10,7 @@ import subprocess
 
 def get_or_create_key():
     key_file = current_app.config['KEY_FILE']
-    """Génère ou récupère la clé de chiffrement"""
+    """Génère ou récupère la clé de chiffrement (création avec permissions restreintes)."""
     try:
         from cryptography.fernet import Fernet
         import os
@@ -19,9 +19,21 @@ def get_or_create_key():
             with open(key_file, 'rb') as f:
                 return f.read()
         else:
+            # Créer le répertoire parent si besoin
+            parent = os.path.dirname(key_file)
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+
             key = Fernet.generate_key()
+            # Écrire avec permissions restreintes
             with open(key_file, 'wb') as f:
                 f.write(key)
+            try:
+                os.chmod(key_file, 0o600)
+            except Exception:
+                # Ne pas bloquer si chmod échoue (ex: FS sans permissions)
+                pass
+
             print(f"✓ Clé de chiffrement générée dans {key_file}")
             return key
     except ImportError:
@@ -64,9 +76,20 @@ def load_emule_config():
     
     if os.path.exists(config_file):
         with open(config_file, 'r') as f:
-            return json.load(f)
-    
-    return current_app.config['EMULE_CONFIG'].copy()
+            cfg = json.load(f)
+    else:
+        cfg = current_app.config['EMULE_CONFIG'].copy()
+
+    # Si un mot de passe est présent, tenter de le déchiffrer (si chiffré)
+    pwd = cfg.get('password', '')
+    if pwd:
+        try:
+            cfg['password'] = decrypt_password(pwd)
+        except Exception:
+            # Laisser la valeur telle quelle si déchiffrement impossible
+            pass
+
+    return cfg
 
 
 def save_emule_config(config):
@@ -102,22 +125,23 @@ def emule_config():
         try:
             new_config = request.get_json()
             config = load_emule_config()
-            
+
             config['enabled'] = new_config.get('enabled', False)
             config['type'] = new_config.get('type', 'amule')
             config['host'] = new_config.get('host', '127.0.0.1')
             config['ec_port'] = new_config.get('ec_port', 4712)
-            
+
             # Ne change le mot de passe que s'il n'est pas masqué
             new_password = new_config.get('password', '')
             if new_password and new_password != '****':
-                config['password'] = new_password
-            
+                # Chiffrer avant sauvegarde si possible
+                config['password'] = encrypt_password(new_password)
+
             if save_emule_config(config):
                 return jsonify({'success': True})
             else:
                 return jsonify({'success': False, 'error': 'Erreur de sauvegarde'}), 500
-        
+
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
 

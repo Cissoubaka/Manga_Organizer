@@ -21,21 +21,31 @@ def search_page():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT DISTINCT forum_category FROM ed2k_links ORDER BY forum_category')
-    categories = [row[0] for row in cursor.fetchall()]
+    # Vérifier si la table ed2k_links existe
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ed2k_links'")
+    table_exists = cursor.fetchone() is not None
     
-    cursor.execute('SELECT COUNT(*) FROM ed2k_links')
-    total_links = cursor.fetchone()[0]
+    categories = []
+    total_links = 0
+    total_threads = 0
     
-    cursor.execute('SELECT COUNT(DISTINCT thread_id) FROM ed2k_links')
-    total_threads = cursor.fetchone()[0]
+    if table_exists:
+        cursor.execute('SELECT DISTINCT forum_category FROM ed2k_links ORDER BY forum_category')
+        categories = [row[0] for row in cursor.fetchall()]
+        
+        cursor.execute('SELECT COUNT(*) FROM ed2k_links')
+        total_links = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(DISTINCT thread_id) FROM ed2k_links')
+        total_threads = cursor.fetchone()[0]
     
     conn.close()
     
     return render_template('search.html', 
                           categories=categories, 
                           total_links=total_links,
-                          total_threads=total_threads)
+                          total_threads=total_threads,
+                          database_empty=not table_exists)
 
 
 @search_bp.route('/api/search', methods=['GET'])
@@ -46,35 +56,48 @@ def search_links():
     volume = request.args.get('volume', '').strip()
     category = request.args.get('category', '').strip()
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Vérifier si la table ed2k_links existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ed2k_links'")
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({
+                'error': 'Il faut d\'abord scraper un forum',
+                'results': []
+            }), 400
+        
+        sql = 'SELECT * FROM ed2k_links WHERE 1=1'
+        params = []
+        
+        if query:
+            sql += ' AND (thread_title LIKE ? OR filename LIKE ?)'
+            params.extend([f'%{query}%', f'%{query}%'])
+        
+        if volume:
+            sql += ' AND volume = ?'
+            params.append(int(volume))
+        
+        if category:
+            sql += ' AND forum_category = ?'
+            params.append(category)
+        
+        sql += ' ORDER BY thread_title, volume'
+        
+        cursor.execute(sql, params)
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(row))
+        
+        conn.close()
+        
+        return jsonify({'results': results})
     
-    sql = 'SELECT * FROM ed2k_links WHERE 1=1'
-    params = []
-    
-    if query:
-        sql += ' AND (thread_title LIKE ? OR filename LIKE ?)'
-        params.extend([f'%{query}%', f'%{query}%'])
-    
-    if volume:
-        sql += ' AND volume = ?'
-        params.append(int(volume))
-    
-    if category:
-        sql += ' AND forum_category = ?'
-        params.append(category)
-    
-    sql += ' ORDER BY thread_title, volume'
-    
-    cursor.execute(sql, params)
-    
-    results = []
-    for row in cursor.fetchall():
-        results.append(dict(row))
-    
-    conn.close()
-    
-    return jsonify({'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @search_bp.route('/api/search')
 def search_ed2k():
@@ -85,6 +108,15 @@ def search_ed2k():
     try:
         conn = sqlite3.connect(current_app.config['DB_FILE'], timeout=30.0)
         cursor = conn.cursor()
+        
+        # Vérifier si la table ed2k_links existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ed2k_links'")
+        if cursor.fetchone() is None:
+            conn.close()
+            return jsonify({
+                'error': 'Il faut d\'abord scraper un forum',
+                'results': []
+            }), 400
 
         sql = '''
             SELECT thread_id, thread_title, thread_url, forum_category, cover_image,

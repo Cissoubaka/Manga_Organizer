@@ -47,6 +47,13 @@
                 <button class="search-button" onclick="searchLinks()">Rechercher</button>
             </div>
 
+            {% if database_empty %}
+            <div class="alert alert-warning" style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; color: #856404;">
+                <strong>⚠️ Base de données vide</strong>
+                <p>Il faut d'abord scraper un forum pour pouvoir faire des recherches. Allez dans la <a href="/settings" style="color: #856404; font-weight: bold;">Configuration</a> pour lancer le scraping.</p>
+            </div>
+            {% endif %}
+
             <div class="stats">
                 <div class="stat-item">
                     <div class="stat-number" id="totalLinks">{{ total_links }}</div>

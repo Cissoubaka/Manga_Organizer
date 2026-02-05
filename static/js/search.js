@@ -45,6 +45,17 @@ async function searchLinks() {
         const response = await fetch(`/api/search?${params}`);
         const data = await response.json();
 
+        // Vérifier s'il y a une erreur
+        if (data.error) {
+            resultsDiv.innerHTML = `
+                <div class="no-results">
+                    <h2>⚠️ ${data.error}</h2>
+                    <p><a href="/settings">Aller à la configuration pour scraper un forum</a></p>
+                </div>
+            `;
+            return;
+        }
+
         allResults = data.results || [];
         currentResults = allResults;
         displayResults(currentResults);

@@ -138,6 +138,7 @@ class LibraryScanner:
                 r'v[\s\.]?(\d+)',                 # v4, v.4
                 r'#(\d+)',                        # #4
                 r'-\s*(\d+)(?:\s|$)',             # - 08 (à la fin ou suivi d'espace)
+                r'\s(\d{1,2})\s*(?:\(|\[)',       # 01 ( ou 01 [ - nombre avant parenthèse/crochet
                 r'\s(\d+)\s*(?:FR|EN|VF|VO)',    # 09 FR (nombre avant langue)
                 r'\s(\d{1,3})$'                   # 08 (nombre de 1-3 chiffres à la fin, évite les années)
             ]
@@ -157,7 +158,16 @@ class LibraryScanner:
         if info['part_number']:
             title_match = re.match(r'^(.+?)\s+(?:Part|Arc|Partie)\s*\d+', normalized_name, re.IGNORECASE)
         else:
-            title_match = re.match(r'^(.+?)\s+(?:Tome|T[\s\.]?\d+|Vol|Volume|v[\s\.]?\d+|#\d+|-\s*\d+)', normalized_name, re.IGNORECASE)
+            # Essayer progressivement différents patterns pour extraire le titre
+            title_patterns = [
+                r'^(.+?)\s+(?:Tome|T[\s\.]?\d+|Vol|Volume|v[\s\.]?\d+|#\d+|-\s*\d+)',  # Patterns explicites
+                r'^(.+?)\s+(\d{1,2})\s*(?:\(|\[)',  # Titre avant nombre + parenthèse/crochet (ex: "Golden kamui 01 (Noda)")
+            ]
+            title_match = None
+            for pattern in title_patterns:
+                title_match = re.match(pattern, normalized_name, re.IGNORECASE)
+                if title_match:
+                    break
 
         if title_match:
             info['title'] = title_match.group(1).strip()
@@ -449,6 +459,28 @@ class LibraryScanner:
                 except UnicodeEncodeError:
                     print(f"  ⚠️  Erreur sur une série: {series_error}")
                 continue
+
+        # ===== FIX: Supprimer les séries qui ne sont plus sur le disque =====
+        # Récupérer toutes les séries actuellement en base de données pour cette bibliothèque
+        cursor.execute('''
+            SELECT id, title FROM series WHERE library_id = ?
+        ''', (library_id,))
+        
+        series_in_db = {row[1]: row[0] for row in cursor.fetchall()}  # {title: id}
+        series_on_disk = set(series_data.keys())  # Titres des séries trouvées sur disque
+        
+        # Trouver les séries en base de données qui n'existent plus sur disque
+        orphaned_series = set(series_in_db.keys()) - series_on_disk
+        
+        # Supprimer les séries orphelines (les volumes seront supprimés en cascade)
+        for orphaned_title in orphaned_series:
+            series_id = series_in_db[orphaned_title]
+            try:
+                cursor.execute('DELETE FROM series WHERE id = ?', (series_id,))
+                print(f"  🗑️  Série supprimée (répertoire absent): {orphaned_title}")
+            except Exception as e:
+                print(f"  ⚠️  Erreur lors de la suppression de '{orphaned_title}': {e}")
+        # ====================================================================
 
         # Mettre à jour la date de scan de la bibliothèque
         cursor.execute('''

@@ -507,6 +507,9 @@ def execute_import():
                     ''', (library_id, series_title, series_path))
 
                     series_id = cursor.lastrowid
+                    # ===== FIX: Enregistrer le series_id dans destination pour mise à jour ultérieure =====
+                    destination['series_id'] = series_id
+                    # =============================
                     target_dir = series_path
                 else:
                     # Utiliser une série existante

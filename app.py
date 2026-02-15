@@ -4,9 +4,13 @@ Point d'entrée principal de l'application Manga Manager
 from flask import Flask, send_from_directory
 from config import config
 import os
+from encryption import ensure_encryption_key
 
 def create_app(config_name='default'):
     """Factory pour créer l'application Flask"""
+    
+    # Initialiser la clé de chiffrement
+    ensure_encryption_key()
     
     app = Flask(__name__)
     app.config.from_object(config[config_name])

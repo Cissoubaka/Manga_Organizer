@@ -21,7 +21,6 @@ class Config:
     
     # Fichiers de configuration
     CONFIG_FILE = os.path.join(DATA_DIR, 'emule_config.json')
-    KEY_FILE = os.path.join(DATA_DIR, '.emule_key')
     EBDZ_CONFIG_FILE = os.path.join(DATA_DIR, 'ebdz_config.json')
     
     # eMule/aMule par défaut

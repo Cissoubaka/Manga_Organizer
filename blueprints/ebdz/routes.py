@@ -6,6 +6,7 @@ from . import ebdz_bp
 import json
 import os
 import sqlite3
+from encryption import encrypt, decrypt, ensure_encryption_key
 
 
 def load_ebdz_config():
@@ -14,9 +15,16 @@ def load_ebdz_config():
     
     if os.path.exists(config_file):
         with open(config_file, 'r') as f:
-            return json.load(f)
+            config = json.load(f)
+            # Déchiffrer le mot de passe s'il est chiffré
+            if config.get('password'):
+                config['password_decrypted'] = decrypt(config.get('password'))
+            return config
     
-    return current_app.config['EBDZ_CONFIG'].copy()
+    default_config = current_app.config['EBDZ_CONFIG'].copy()
+    if default_config.get('password'):
+        default_config['password_decrypted'] = decrypt(default_config.get('password'))
+    return default_config
 
 
 def save_ebdz_config(config):
@@ -24,8 +32,22 @@ def save_ebdz_config(config):
     config_file = current_app.config['EBDZ_CONFIG_FILE']
     
     try:
+        # Préparer une copie pour la sauvegarde
+        config_to_save = config.copy()
+        
+        # Chiffrer le mot de passe avant la sauvegarde
+        if config_to_save.get('password'):
+            # Enlever le flag _decrypted temporaire aux fins de sauvegarde
+            if 'password_decrypted' in config_to_save:
+                # Utiliser le mot de passe déchiffré pour le chiffrer à nouveau
+                config_to_save['password'] = encrypt(config_to_save['password_decrypted'])
+                del config_to_save['password_decrypted']
+            else:
+                # Le mot de passe est déjà en clair, le chiffrer
+                config_to_save['password'] = encrypt(config_to_save['password'])
+        
         with open(config_file, 'w') as f:
-            json.dump(config, f, indent=4)
+            json.dump(config_to_save, f, indent=4)
         return True
     except Exception as e:
         print(f"Erreur sauvegarde config : {e}")
@@ -55,7 +77,7 @@ def ebdz_config():
             # Ne met à jour le mot de passe que s'il n'est pas masqué
             new_password = data.get('password', '')
             if new_password and new_password != '****':
-                config['password'] = new_password
+                config['password_decrypted'] = new_password
             
             # Validation des forums
             forums = []
@@ -86,7 +108,7 @@ def scrape():
     try:
         config = load_ebdz_config()
         username = config.get('username', '')
-        password = config.get('password', '')
+        password = config.get('password_decrypted', '')  # Utiliser le mot de passe déchiffré
         all_forums = config.get('forums', [])
         
         if not username or not password:

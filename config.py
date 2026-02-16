@@ -25,10 +25,12 @@ class Config:
     PROWLARR_CONFIG_FILE = os.path.join(DATA_DIR, 'prowlarr_config.json')
     
     # eMule/aMule par défaut
+    # Pour Docker: utiliser AMULE_HOST pour configurer l'adresse
+    AMULE_HOST = os.environ.get('AMULE_HOST', '127.0.0.1')
     EMULE_CONFIG = {
         'enabled': False,
         'type': 'amule',
-        'host': '127.0.0.1',
+        'host': AMULE_HOST,
         'port': 4711,
         'ec_port': 4712,
         'password': ''

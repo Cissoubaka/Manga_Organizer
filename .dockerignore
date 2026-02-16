@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Données
+data/*.db
+data/*.db.old
+data/emule_config.json
+data/ebdz_config.json
+data/prowlarr_config.json
+
+# Autres
+.dockerignore
+Dockerfile
+docker-compose.yml
+*.md

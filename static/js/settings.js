@@ -1,3 +1,4 @@
+
 let passwordVisible = false;
 let ebdzPasswordVisible = false;
 
@@ -94,11 +95,9 @@ async function loadEbdzConfig() {
         document.getElementById('ebdzUsername').value = config.username || '';
 
         // Le serveur retourne '****' si un mot de passe existe.
-        // Affiche '****' dans le champ pour indiquer qu'un mot de passe est enregistré,
-        // sinon vide le champ s'il n'y a pas de mot de passe.
-        if (config.password && config.password === '****') {
-            document.getElementById('ebdzPassword').value = '****';
-        } else if (!config.password) {
+        // On ne touche au champ que si c'est vide (pas de mot de passe enregistré).
+        // Sinon on laisse ce qui est déjà dans le champ (valeur tapée ou précédente).
+        if (!config.password) {
             document.getElementById('ebdzPassword').value = '';
         }
 
@@ -327,6 +326,221 @@ function toggleEbdzPassword() {
     btn.textContent = ebdzPasswordVisible ? '🙈 Masquer' : '👁️ Afficher';
 }
 
+// ===== PROWLARR =====
+let prowlarrPasswordVisible = false;
+
+async function loadProwlarrSettings() {
+    try {
+        const response = await fetch('/api/prowlarr/config');
+        const config = await response.json();
+        
+        document.getElementById('prowlarrEnabled').checked = config.enabled;
+        document.getElementById('prowlarrUrl').value = config.url || '';
+        document.getElementById('prowlarrPort').value = config.port || 9696;
+        
+        if (config.api_key && config.api_key !== '****') {
+            document.getElementById('prowlarrApiKey').value = config.api_key;
+        }
+    } catch (error) {
+        showMessage('prowlarrMessage', '❌ Erreur lors du chargement de la configuration Prowlarr', 'error');
+    }
+}
+
+async function saveProwlarrSettings() {
+    const config = {
+        enabled: document.getElementById('prowlarrEnabled').checked,
+        url: document.getElementById('prowlarrUrl').value.trim(),
+        port: parseInt(document.getElementById('prowlarrPort').value),
+        api_key: document.getElementById('prowlarrApiKey').value
+    };
+
+    if (config.enabled && !config.url) {
+        showMessage('prowlarrMessage', '⚠️ Veuillez entrer l\'URL du serveur Prowlarr', 'warning');
+        return;
+    }
+
+    if (config.enabled && !config.api_key) {
+        showMessage('prowlarrMessage', '⚠️ Veuillez entrer la clé API Prowlarr', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/prowlarr/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('prowlarrMessage', '✅ Configuration Prowlarr enregistrée avec succès !', 'success');
+        } else {
+            showMessage('prowlarrMessage', '❌ Erreur: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('prowlarrMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+    }
+}
+
+async function testProwlarrConnection() {
+    showMessage('prowlarrMessage', '⏳ Test de connexion en cours...', 'info');
+    try {
+        const response = await fetch('/api/prowlarr/test');
+        const data = await response.json();
+        if (data.success) {
+            showMessage('prowlarrMessage', '✅ Connexion réussie à Prowlarr !', 'success');
+        } else {
+            showMessage('prowlarrMessage', '❌ Échec de la connexion: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('prowlarrMessage', '❌ Erreur: ' + error.message, 'error');
+    }
+}
+
+function resetProwlarrSettings() {
+    if (!confirm('Voulez-vous réinitialiser la configuration Prowlarr ?')) return;
+    document.getElementById('prowlarrEnabled').checked = false;
+    document.getElementById('prowlarrUrl').value = '';
+    document.getElementById('prowlarrPort').value = '9696';
+    document.getElementById('prowlarrApiKey').value = '';
+    showMessage('prowlarrMessage', '🔄 Configuration réinitialisée', 'info');
+}
+
+function toggleProwlarrPassword() {
+    const input = document.getElementById('prowlarrApiKey');
+    const btn = input.closest('.password-input-group').querySelector('.btn-toggle-password');
+    prowlarrPasswordVisible = !prowlarrPasswordVisible;
+    input.type = prowlarrPasswordVisible ? 'text' : 'password';
+    btn.textContent = prowlarrPasswordVisible ? '🙈 Masquer' : '👁️ Afficher';
+}
+
+// ===== PROWLARR INDEXERS =====
+async function loadProwlarrIndexers() {
+    showMessage('indexersMessage', '⏳ Récupération des indexeurs en cours...', 'info');
+    try {
+        const response = await fetch('/api/prowlarr/indexers');
+        const data = await response.json();
+        
+        if (!data.success) {
+            // Afficher le message d'erreur de manière lisible
+            let errorMsg = data.error || 'Erreur inconnue';
+            if (errorMsg.includes('URLs essayées')) {
+                // Le message contient des infos de debug, l'afficher complètement
+                showMessage('indexersMessage', '❌ ' + errorMsg, 'error');
+            } else {
+                showMessage('indexersMessage', '❌ Erreur: ' + errorMsg, 'error');
+            }
+            return;
+        }
+        
+        if (!data.indexers || data.indexers.length === 0) {
+            showMessage('indexersMessage', '⚠️ Aucun indexeur trouvé dans Prowlarr', 'warning');
+        }
+        
+        displayIndexers(data.indexers || []);
+        showMessage('indexersMessage', '✅ Indexeurs chargés avec succès !', 'success');
+    } catch (error) {
+        showMessage('indexersMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+    }
+}
+
+function displayIndexers(indexers) {
+    const list = document.getElementById('indexersList');
+    
+    if (indexers.length === 0) {
+        list.innerHTML = '<p style="color: #999;">Aucun indexeur trouvé</p>';
+        return;
+    }
+    
+    let html = '';
+    indexers.forEach(indexer => {
+        let categoriesHtml = '';
+        
+        if (indexer.categories && indexer.categories.length > 0) {
+            categoriesHtml = '<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;">';
+            categoriesHtml += '<strong style="display: block; margin-bottom: 8px; font-size: 0.9em;">Catégories:</strong>';
+            categoriesHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">';
+            
+            indexer.categories.forEach(category => {
+                const isSubcategory = category.name.startsWith('  ↳');
+                categoriesHtml += `
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85em; padding: ${isSubcategory ? '2px 0 2px 10px' : '0'};">
+                        <input type="checkbox" class="category-checkbox" data-indexer-id="${indexer.id}" data-category-id="${category.id}" ${category.selected ? 'checked' : ''}>
+                        <span>${category.name}</span>
+                    </label>
+                `;
+            });
+            
+            categoriesHtml += '</div></div>';
+        } else {
+            categoriesHtml = '<div style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 3px; border-left: 3px solid #ffc107; font-size: 0.85em; color: #666;">⚠️ Pas de catégories trouvées pour cet indexeur</div>';
+        }
+        
+        html += `
+            <div style="padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 15px; background: #fafafa;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
+                    <input type="checkbox" id="indexer-${indexer.id}" class="indexer-checkbox" value="${indexer.id}" ${indexer.selected ? 'checked' : ''}>
+                    <div style="flex: 1;">
+                        <label for="indexer-${indexer.id}" style="cursor: pointer; margin: 0;">
+                            <strong>${indexer.name}</strong>
+                            <span style="color: #999; font-size: 0.9em; margin-left: 10px;">(ID: ${indexer.id})</span>
+                        </label>
+                        ${indexer.language ? `<div style="font-size: 0.85em; color: #666;">🌐 ${indexer.language}</div>` : ''}
+                    </div>
+                </div>
+                ${categoriesHtml}
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+}
+
+async function saveProwlarrIndexers() {
+    const selected = [];
+    const selectedCategories = {};
+    
+    // Récupérer les indexeurs sélectionnés
+    document.querySelectorAll('.indexer-checkbox:checked').forEach(checkbox => {
+        selected.push(parseInt(checkbox.value));
+        selectedCategories[checkbox.value.toString()] = [];
+    });
+    
+    // Récupérer les catégories sélectionnées pour chaque indexeur
+    document.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+        const indexerId = checkbox.getAttribute('data-indexer-id');
+        const categoryId = parseInt(checkbox.getAttribute('data-category-id'));
+        
+        if (selectedCategories[indexerId]) {
+            if (!Array.isArray(selectedCategories[indexerId])) {
+                selectedCategories[indexerId] = [];
+            }
+            selectedCategories[indexerId].push(categoryId);
+        }
+    });
+    
+    try {
+        const response = await fetch('/api/prowlarr/indexers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                selected_indexers: selected,
+                selected_categories: selectedCategories
+            })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('indexersMessage', '✅ Indexeurs et catégories enregistrés !', 'success');
+        } else {
+            showMessage('indexersMessage', '❌ Erreur: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('indexersMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+    }
+}
+
+
 // ===== TABS =====
 function switchTab(tabName) {
     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -348,4 +562,5 @@ function showMessage(elementId, text, type) {
 window.addEventListener('load', () => {
     loadSettings();
     loadEbdzConfig();
+    loadProwlarrSettings();
 });

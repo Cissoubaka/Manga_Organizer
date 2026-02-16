@@ -61,7 +61,9 @@
                         <input type="text" id="library-path" required placeholder="/chemin/vers/mes/mangas" style="flex: 1;">
                     </div>
                     <input type="file" id="folder-browser" webkitdirectory directory multiple style="display: none;" onchange="handleFolderSelect(event)">
-                    <small style="color: #666; font-size: 0.85em;">Le chemin complet vers votre dossier de mangas</small>
+                    <small style="color: #666; font-size: 0.85em;">
+                        Le chemin complet du dossier contenant vos mangas. Avec Docker, utilisez les chemins montés dans docker-compose (ex: /library/Ma Bibliotheque). Les espaces dans le nom du dossier sont supportés.
+                    </small>
                 </div>
 
                 <div class="form-group">

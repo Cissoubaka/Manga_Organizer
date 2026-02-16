@@ -251,8 +251,12 @@ class LibraryScanner:
         """
         print(f"\n📂 Scan du répertoire: {library_path}")
 
+        # Vérifier que le chemin existe et est bien un répertoire
         if not os.path.exists(library_path):
-            raise Exception(f"Le chemin {library_path} n'existe pas")
+            raise Exception(f"Le chemin n'existe pas: '{library_path}'")
+        
+        if not os.path.isdir(library_path):
+            raise Exception(f"Le chemin n'est pas un répertoire: '{library_path}'")
 
         # Extensions supportées
         supported_extensions = {'.cbz', '.cbr', '.zip', '.rar', '.pdf', '.epub'}
@@ -269,7 +273,9 @@ class LibraryScanner:
             # Lister tous les éléments dans le répertoire de la bibliothèque
             items = os.listdir(library_path)
         except PermissionError as e:
-            raise Exception(f"Permission refusée pour accéder à {library_path}")
+            raise Exception(f"Permission refusée pour accéder à: '{library_path}'")
+        except (FileNotFoundError, NotADirectoryError, OSError) as e:
+            raise Exception(f"Impossible d'accéder au répertoire '{library_path}': {str(e)}")
         
         for item in items:
             item_path = os.path.join(library_path, item)
@@ -299,8 +305,8 @@ class LibraryScanner:
                                 'parsed': parsed,
                                 'file_size': os.path.getsize(filepath)
                             })
-                except PermissionError:
-                    print(f"⚠️  Permission refusée pour {item_path}")
+                except (PermissionError, OSError) as e:
+                    print(f"⚠️  Impossible d'accéder à la série '{series_title}' ('{item_path}'): {str(e)}")
                     continue
             
             # Si c'est un fichier directement dans la bibliothèque (pas dans un sous-dossier)

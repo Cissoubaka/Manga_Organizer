@@ -171,14 +171,28 @@ def scan_library(library_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT path FROM libraries WHERE id = ?', (library_id,))
+        cursor.execute('SELECT name, path FROM libraries WHERE id = ?', (library_id,))
         result = cursor.fetchone()
         conn.close()
         
         if not result:
             return jsonify({'success': False, 'error': 'Bibliothèque non trouvée'}), 404
         
+        library_name = result['name']
         library_path = result['path']
+        
+        # Vérifier que le chemin est accessible avant de scanner
+        if not os.path.exists(library_path):
+            return jsonify({
+                'success': False, 
+                'error': f'Le dossier de la bibliothèque "{library_name}" n\'existe pas ou n\'est pas accessible.\nChemin: {library_path}'
+            }), 400
+        
+        if not os.path.isdir(library_path):
+            return jsonify({
+                'success': False, 
+                'error': f'Le chemin n\'est pas un répertoire: {library_path}'
+            }), 400
         
         # Scanner
         scanner = LibraryScanner()
@@ -187,7 +201,12 @@ def scan_library(library_id):
         return jsonify({'success': True, 'series_count': series_count})
     
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        error_msg = str(e)
+        print(f"❌ Erreur lors du scan de la bibliothèque {library_id}: {error_msg}")
+        return jsonify({
+            'success': False, 
+            'error': f'Erreur lors du scan: {error_msg}'
+        }), 500
 
 
 @library_bp.route('/api/series/<int:series_id>/volumes', methods=['GET'])

@@ -23,6 +23,7 @@ wheels/
 .installed.cfg
 *.egg
 data/
+.env*
 
 # Flask
 instance/
@@ -47,5 +48,3 @@ data/covers/*
 .DS_Store
 Thumbs.db
 
-# Fichiers temporaires
-app_original.py

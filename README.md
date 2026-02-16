@@ -14,7 +14,7 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 
 ## 🚀 Démarrage rapide
 
-### Avec Docker (recommandé)
+### Avec Docker (non fonctionnel pour le moment)
 
 ```bash
 # 1. Cloner le projet
@@ -308,6 +308,8 @@ docker-compose up -d --build --no-cache
 - ✅ `.rar` (RAR4, RAR5)
 - ✅ `.zip`
 - ✅ `.7z`
+- ✅ `.cbz`
+- ✅ `.cbr`
 
 ### Images
 - ✅ `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`
@@ -320,10 +322,6 @@ docker-compose up -d --build --no-cache
 
 ```
 Mangas/
-├── "Manga Title Vol 01"
-│   ├── page_001.jpg
-│   ├── page_002.jpg
-│   └── ...
 ├── "Manga Title Vol 02.zip"
 ├── "Manga Title Vol 03.rar"
 └── ...

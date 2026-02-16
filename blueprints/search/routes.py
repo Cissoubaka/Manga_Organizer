@@ -48,59 +48,9 @@ def search_page():
                           database_empty=not table_exists)
 
 
-@search_bp.route('/api/search', methods=['GET'])
-def search_links():
-    """Recherche de liens ED2K"""
-    
-    query = request.args.get('query', '').strip()
-    volume = request.args.get('volume', '').strip()
-    category = request.args.get('category', '').strip()
-    
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Vérifier si la table ed2k_links existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ed2k_links'")
-        if cursor.fetchone() is None:
-            conn.close()
-            return jsonify({
-                'error': 'Il faut d\'abord scraper un forum',
-                'results': []
-            }), 400
-        
-        sql = 'SELECT * FROM ed2k_links WHERE 1=1'
-        params = []
-        
-        if query:
-            sql += ' AND (thread_title LIKE ? OR filename LIKE ?)'
-            params.extend([f'%{query}%', f'%{query}%'])
-        
-        if volume:
-            sql += ' AND volume = ?'
-            params.append(int(volume))
-        
-        if category:
-            sql += ' AND forum_category = ?'
-            params.append(category)
-        
-        sql += ' ORDER BY thread_title, volume'
-        
-        cursor.execute(sql, params)
-        
-        results = []
-        for row in cursor.fetchall():
-            results.append(dict(row))
-        
-        conn.close()
-        
-        return jsonify({'results': results})
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @search_bp.route('/api/search')
 def search_ed2k():
+    """Recherche de liens ED2K"""
     query = request.args.get('query', '').strip()
     volume = request.args.get('volume', '').strip()
     category = request.args.get('category', '').strip()

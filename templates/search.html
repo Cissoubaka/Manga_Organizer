@@ -28,7 +28,7 @@
                     class="search-input" 
                     id="searchInput" 
                     placeholder="Rechercher un manga, anime, film..."
-                    onkeypress="if(event.key === 'Enter') searchLinks()"
+                    onkeypress="if(event.key === 'Enter') searchEdzkLinks()"
                 >
                 <input 
                     type="number" 
@@ -36,7 +36,7 @@
                     id="volumeInput" 
                     placeholder="Volume n°"
                     min="1"
-                    onkeypress="if(event.key === 'Enter') searchLinks()"
+                    onkeypress="if(event.key === 'Enter') searchEdzkLinks()"
                 >
                 <select class="category-select" id="categorySelect">
                     <option value="">Toutes les catégories</option>
@@ -44,7 +44,10 @@
                     <option value="{{ category }}">{{ category }}</option>
                     {% endfor %}
                 </select>
-                <button class="search-button" onclick="searchLinks()">Rechercher</button>
+                <div class="search-buttons-group">
+                    <button class="search-button" onclick="searchEdzkLinks()">🕸️ Recherche ebdz ed2k</button>
+                    <button class="search-button search-button-prowlarr" onclick="searchProwlarr()">🔍 Recherche prowlarr</button>
+                </div>
             </div>
 
             {% if database_empty %}

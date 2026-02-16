@@ -22,6 +22,7 @@ class Config:
     # Fichiers de configuration
     CONFIG_FILE = os.path.join(DATA_DIR, 'emule_config.json')
     EBDZ_CONFIG_FILE = os.path.join(DATA_DIR, 'ebdz_config.json')
+    PROWLARR_CONFIG_FILE = os.path.join(DATA_DIR, 'prowlarr_config.json')
     
     # eMule/aMule par défaut
     EMULE_CONFIG = {
@@ -38,6 +39,15 @@ class Config:
         'username': '',
         'password': '',
         'forums': []
+    }
+    
+    # Prowlarr par défaut
+    PROWLARR_CONFIG = {
+        'enabled': False,
+        'url': 'http://127.0.0.1',
+        'port': 9696,
+        'api_key': '',
+        'selected_indexers': []
     }
     
     @staticmethod

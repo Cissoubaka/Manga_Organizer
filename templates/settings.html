@@ -28,6 +28,9 @@
                 <button class="tab-button" onclick="switchTab('ebdz')">
                     🕸️ ebdz.net
                 </button>
+                <button class="tab-button" onclick="switchTab('prowlarr')">
+                    🔍 Prowlarr
+                </button>
                 <button class="tab-button" onclick="switchTab('general')" style="opacity: 0.5; cursor: not-allowed;" disabled>
                     🔧 Général (bientôt)
                 </button>
@@ -249,6 +252,132 @@
                                 <summary>Qu'est-ce que "max pages" ?</summary>
                                 <div class="help-content">
                                     <p>Le scraper parcourt les threads page par page. <strong>Max pages</strong> permet de limiter le nombre de pages scannées. Laissez le champ vide pour scraper tout le forum sans limite.</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Onglet Prowlarr -->
+                <div class="tab-content" id="tab-prowlarr">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>🔍 Configuration Prowlarr</h2>
+                            <p class="section-description">
+                                Configurez la connexion à votre serveur Prowlarr pour intégrer les indexeurs 
+                                et améliorer vos recherches de contenu.
+                            </p>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" id="prowlarrEnabled">
+                                <label for="prowlarrEnabled">
+                                    <strong>Activer l'intégration Prowlarr</strong>
+                                    <span class="help-text">Permet d'utiliser les indexeurs Prowlarr dans l'application</span>
+                                </label>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="prowlarrUrl">URL du serveur</label>
+                                    <input type="text" id="prowlarrUrl" placeholder="http://localhost:9696 ou http://192.168.1.100:9696">
+                                    <small class="help-text">Adresse complète du serveur Prowlarr (avec http:// ou https://)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="prowlarrPort">Port</label>
+                                    <input type="number" id="prowlarrPort" value="9696" placeholder="9696">
+                                    <small class="help-text">Port d'accès à Prowlarr (défaut: 9696)</small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="prowlarrApiKey">Clé API</label>
+                                <div class="password-input-group">
+                                    <input type="password" id="prowlarrApiKey" placeholder="Votre clé API Prowlarr">
+                                    <button type="button" class="btn-toggle-password" onclick="toggleProwlarrPassword()">
+                                        👁️ Afficher
+                                    </button>
+                                </div>
+                                <small class="help-text">Clé API disponible dans les paramètres Prowlarr > Paramètres > Général > Sécurité</small>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-success" onclick="saveProwlarrSettings()">
+                                    💾 Enregistrer
+                                </button>
+                                <button class="btn" onclick="testProwlarrConnection()">
+                                    🔌 Tester la connexion
+                                </button>
+                                <button class="btn" onclick="resetProwlarrSettings()">
+                                    🔄 Réinitialiser
+                                </button>
+                            </div>
+
+                            <div id="prowlarrMessage" class="message"></div>
+                        </div>
+
+                        <!-- Sélection des indexeurs -->
+                        <div class="settings-card" style="margin-top: 30px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="color: #333; margin: 0;">🔎 Indexeurs à utiliser</h3>
+                                <button class="btn btn-success" style="padding: 8px 18px; font-size: 0.9em;" onclick="loadProwlarrIndexers()">
+                                    📥 Récupérer les indexeurs
+                                </button>
+                            </div>
+
+                            <div id="indexersList" style="margin-bottom: 15px;">
+                                <p style="color: #999;">Cliquez sur "Récupérer les indexeurs" pour charger la liste depuis Prowlarr</p>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-success" onclick="saveProwlarrIndexers()">
+                                    💾 Enregistrer la sélection
+                                </button>
+                            </div>
+                            <div id="indexersMessage" class="message"></div>
+                        </div>
+
+                        <!-- Aide configuration -->
+                        <div class="help-section">
+                            <h3>📖 Aide à la configuration</h3>
+                            
+                            <details class="help-details">
+                                <summary>Où trouver ma clé API Prowlarr ?</summary>
+                                <div class="help-content">
+                                    <ol>
+                                        <li>Ouvrez Prowlarr dans votre navigateur</li>
+                                        <li>Allez dans <strong>Paramètres (⚙️) > Général</strong></li>
+                                        <li>Faites défiler jusqu'à <strong>Sécurité</strong></li>
+                                        <li>Vous trouvez le champ <strong>Clé API</strong></li>
+                                        <li>Copiez la clé et collez-la dans le formulaire ci-dessus</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>Comment accéder à Prowlarr depuis une autre machine ?</summary>
+                                <div class="help-content">
+                                    <ul>
+                                        <li>Si Prowlarr est sur la même machine : <code>http://127.0.0.1:9696</code></li>
+                                        <li>Si Prowlarr est sur une autre machine du réseau : <code>http://192.168.1.100:9696</code> (remplacez par l'IP)</li>
+                                        <li>Assurez-vous que le port 9696 (ou celui configuré) est accessible</li>
+                                        <li>En HTTPS, utilisez <code>https://</code> au lieu de <code>http://</code></li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>La connexion échoue, que faire ?</summary>
+                                <div class="help-content">
+                                    <ul>
+                                        <li>✅ Vérifiez que Prowlarr est bien démarré</li>
+                                        <li>✅ Vérifiez que l'URL est correcte (avec http:// ou https://)</li>
+                                        <li>✅ Vérifiez que la clé API est correcte</li>
+                                        <li>✅ Vérifiez que le port est accessible (pare-feu)</li>
+                                        <li>✅ Essayez d'accéder à Prowlarr dans votre navigateur pour vérifier que ça fonctionne</li>
+                                    </ul>
                                 </div>
                             </details>
                         </div>
@@ -606,6 +735,221 @@
             btn.textContent = ebdzPasswordVisible ? '🙈 Masquer' : '👁️ Afficher';
         }
 
+        // ===== PROWLARR =====
+        let prowlarrPasswordVisible = false;
+
+        async function loadProwlarrSettings() {
+            try {
+                const response = await fetch('/api/prowlarr/config');
+                const config = await response.json();
+                
+                document.getElementById('prowlarrEnabled').checked = config.enabled;
+                document.getElementById('prowlarrUrl').value = config.url || '';
+                document.getElementById('prowlarrPort').value = config.port || 9696;
+                
+                if (config.api_key && config.api_key !== '****') {
+                    document.getElementById('prowlarrApiKey').value = config.api_key;
+                }
+            } catch (error) {
+                showMessage('prowlarrMessage', '❌ Erreur lors du chargement de la configuration Prowlarr', 'error');
+            }
+        }
+
+        async function saveProwlarrSettings() {
+            const config = {
+                enabled: document.getElementById('prowlarrEnabled').checked,
+                url: document.getElementById('prowlarrUrl').value.trim(),
+                port: parseInt(document.getElementById('prowlarrPort').value),
+                api_key: document.getElementById('prowlarrApiKey').value
+            };
+
+            if (config.enabled && !config.url) {
+                showMessage('prowlarrMessage', '⚠️ Veuillez entrer l\'URL du serveur Prowlarr', 'warning');
+                return;
+            }
+
+            if (config.enabled && !config.api_key) {
+                showMessage('prowlarrMessage', '⚠️ Veuillez entrer la clé API Prowlarr', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/prowlarr/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('prowlarrMessage', '✅ Configuration Prowlarr enregistrée avec succès !', 'success');
+                } else {
+                    showMessage('prowlarrMessage', '❌ Erreur: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('prowlarrMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+            }
+        }
+
+        async function testProwlarrConnection() {
+            showMessage('prowlarrMessage', '⏳ Test de connexion en cours...', 'info');
+            try {
+                const response = await fetch('/api/prowlarr/test');
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('prowlarrMessage', '✅ Connexion réussie à Prowlarr !', 'success');
+                } else {
+                    showMessage('prowlarrMessage', '❌ Échec de la connexion: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('prowlarrMessage', '❌ Erreur: ' + error.message, 'error');
+            }
+        }
+
+        function resetProwlarrSettings() {
+            if (!confirm('Voulez-vous réinitialiser la configuration Prowlarr ?')) return;
+            document.getElementById('prowlarrEnabled').checked = false;
+            document.getElementById('prowlarrUrl').value = '';
+            document.getElementById('prowlarrPort').value = '9696';
+            document.getElementById('prowlarrApiKey').value = '';
+            showMessage('prowlarrMessage', '🔄 Configuration réinitialisée', 'info');
+        }
+
+        function toggleProwlarrPassword() {
+            const input = document.getElementById('prowlarrApiKey');
+            const btn = input.closest('.password-input-group').querySelector('.btn-toggle-password');
+            prowlarrPasswordVisible = !prowlarrPasswordVisible;
+            input.type = prowlarrPasswordVisible ? 'text' : 'password';
+            btn.textContent = prowlarrPasswordVisible ? '🙈 Masquer' : '👁️ Afficher';
+        }
+
+        // ===== PROWLARR INDEXERS =====
+        async function loadProwlarrIndexers() {
+            showMessage('indexersMessage', '⏳ Récupération des indexeurs en cours...', 'info');
+            try {
+                const response = await fetch('/api/prowlarr/indexers');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    // Afficher le message d'erreur de manière lisible
+                    let errorMsg = data.error || 'Erreur inconnue';
+                    if (errorMsg.includes('URLs essayées')) {
+                        // Le message contient des infos de debug, l'afficher complètement
+                        showMessage('indexersMessage', '❌ ' + errorMsg, 'error');
+                    } else {
+                        showMessage('indexersMessage', '❌ Erreur: ' + errorMsg, 'error');
+                    }
+                    return;
+                }
+                
+                if (!data.indexers || data.indexers.length === 0) {
+                    showMessage('indexersMessage', '⚠️ Aucun indexeur trouvé dans Prowlarr', 'warning');
+                }
+                
+                displayIndexers(data.indexers || []);
+                showMessage('indexersMessage', '✅ Indexeurs chargés avec succès !', 'success');
+            } catch (error) {
+                showMessage('indexersMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+            }
+        }
+
+        function displayIndexers(indexers) {
+            const list = document.getElementById('indexersList');
+            
+            if (indexers.length === 0) {
+                list.innerHTML = '<p style="color: #999;">Aucun indexeur trouvé</p>';
+                return;
+            }
+            
+            let html = '';
+            indexers.forEach(indexer => {
+                let categoriesHtml = '';
+                
+                if (indexer.categories && indexer.categories.length > 0) {
+                    categoriesHtml = '<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;">';
+                    categoriesHtml += '<strong style="display: block; margin-bottom: 8px; font-size: 0.9em;">Catégories:</strong>';
+                    categoriesHtml += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">';
+                    
+                    indexer.categories.forEach(category => {
+                        const isSubcategory = category.name.startsWith('  ↳');
+                        categoriesHtml += `
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85em; padding: ${isSubcategory ? '2px 0 2px 10px' : '0'};">
+                                <input type="checkbox" class="category-checkbox" data-indexer-id="${indexer.id}" data-category-id="${category.id}" ${category.selected ? 'checked' : ''}>
+                                <span>${category.name}</span>
+                            </label>
+                        `;
+                    });
+                    
+                    categoriesHtml += '</div></div>';
+                } else {
+                    categoriesHtml = '<div style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 3px; border-left: 3px solid #ffc107; font-size: 0.85em; color: #666;">⚠️ Pas de catégories trouvées pour cet indexeur</div>';
+                }
+                
+                html += `
+                    <div style="padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 15px; background: #fafafa;">
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
+                            <input type="checkbox" id="indexer-${indexer.id}" class="indexer-checkbox" value="${indexer.id}" ${indexer.selected ? 'checked' : ''}>
+                            <div style="flex: 1;">
+                                <label for="indexer-${indexer.id}" style="cursor: pointer; margin: 0;">
+                                    <strong>${indexer.name}</strong>
+                                    <span style="color: #999; font-size: 0.9em; margin-left: 10px;">(ID: ${indexer.id})</span>
+                                </label>
+                                ${indexer.language ? `<div style="font-size: 0.85em; color: #666;">🌐 ${indexer.language}</div>` : ''}
+                            </div>
+                        </div>
+                        ${categoriesHtml}
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+        }
+
+        async function saveProwlarrIndexers() {
+            const selected = [];
+            const selectedCategories = {};
+            
+            // Récupérer les indexeurs sélectionnés
+            document.querySelectorAll('.indexer-checkbox:checked').forEach(checkbox => {
+                selected.push(parseInt(checkbox.value));
+                selectedCategories[checkbox.value.toString()] = [];
+            });
+            
+            // Récupérer les catégories sélectionnées pour chaque indexeur
+            document.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+                const indexerId = checkbox.getAttribute('data-indexer-id');
+                const categoryId = parseInt(checkbox.getAttribute('data-category-id'));
+                
+                if (selectedCategories[indexerId]) {
+                    if (!Array.isArray(selectedCategories[indexerId])) {
+                        selectedCategories[indexerId] = [];
+                    }
+                    selectedCategories[indexerId].push(categoryId);
+                }
+            });
+            
+            try {
+                const response = await fetch('/api/prowlarr/indexers', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        selected_indexers: selected,
+                        selected_categories: selectedCategories
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('indexersMessage', '✅ Indexeurs et catégories enregistrés !', 'success');
+                } else {
+                    showMessage('indexersMessage', '❌ Erreur: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('indexersMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+            }
+        }
+
+
         // ===== TABS =====
         function switchTab(tabName) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -627,6 +971,7 @@
         window.addEventListener('load', () => {
             loadSettings();
             loadEbdzConfig();
+            loadProwlarrSettings();
         });
     </script>
 </body>

@@ -1,5 +1,6 @@
 let currentResults = [];
 let allResults = [];
+let currentSearchType = 'edzk'; // 'edzk' ou 'prowlarr'
 
 function formatBytes(bytes) {
     if (!bytes) return 'N/A';
@@ -20,7 +21,7 @@ function decodeFilename(filename) {
     }
 }
 
-async function searchLinks() {
+async function searchEdzkLinks() {
     const query = document.getElementById('searchInput').value;
     const volume = document.getElementById('volumeInput').value;
     const category = document.getElementById('categorySelect').value;
@@ -30,6 +31,7 @@ async function searchLinks() {
         return;
     }
 
+    currentSearchType = 'edzk';
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '<div class="loading">⏳ Recherche en cours...</div>';
     
@@ -70,33 +72,100 @@ async function searchLinks() {
     }
 }
 
+async function searchProwlarr() {
+    const query = document.getElementById('searchInput').value;
+    const volume = document.getElementById('volumeInput').value;
+    
+    if (!query) {
+        alert('Veuillez entrer au moins un titre');
+        return;
+    }
+
+    currentSearchType = 'prowlarr';
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '<div class="loading">⏳ Recherche sur Prowlarr en cours...</div>';
+    
+    // Cacher la barre de filtrage pendant la recherche
+    document.getElementById('filterBox').style.display = 'none';
+
+    try {
+        const params = new URLSearchParams();
+        params.append('query', query);
+        if (volume) params.append('volume', volume);
+
+        const response = await fetch(`/api/prowlarr/search?${params}`);
+        const data = await response.json();
+
+        // Vérifier s'il y a une erreur
+        if (data.error) {
+            resultsDiv.innerHTML = `
+                <div class="no-results">
+                    <h2>⚠️ ${data.error}</h2>
+                    <p><a href="/settings">Aller à la configuration pour configurer Prowlarr</a></p>
+                </div>
+            `;
+            return;
+        }
+
+        allResults = data.results || [];
+        currentResults = allResults;
+        displayProwlarrResults(currentResults);
+        
+        // Afficher la barre de filtrage si on a des résultats
+        if (allResults.length > 0) {
+            document.getElementById('filterBox').style.display = 'block';
+            updateFilterStats();
+        }
+    } catch (error) {
+        resultsDiv.innerHTML = '<div class="no-results"><h2>Erreur</h2><p>' + error + '</p></div>';
+    }
+}
+
 function filterResults() {
     const filterText = document.getElementById('filterInput').value.toLowerCase();
     
     if (!filterText) {
         currentResults = allResults;
     } else {
-        currentResults = allResults.filter(result => {
-            const title = result.thread_title.toLowerCase();
-            const filename = decodeFilename(result.filename).toLowerCase();
-            const volume = result.volume ? result.volume.toString() : '';
-            const category = result.forum_category ? result.forum_category.toLowerCase() : '';
-            
-            return title.includes(filterText) || 
-                   filename.includes(filterText) || 
-                   volume.includes(filterText) ||
-                   category.includes(filterText);
-        });
+        if (currentSearchType === 'edzk') {
+            currentResults = allResults.filter(result => {
+                const title = result.thread_title.toLowerCase();
+                const filename = decodeFilename(result.filename).toLowerCase();
+                const volume = result.volume ? result.volume.toString() : '';
+                const category = result.forum_category ? result.forum_category.toLowerCase() : '';
+                
+                return title.includes(filterText) || 
+                       filename.includes(filterText) || 
+                       volume.includes(filterText) ||
+                       category.includes(filterText);
+            });
+        } else {
+            currentResults = allResults.filter(result => {
+                const title = result.title.toLowerCase();
+                const indexer = result.indexer ? result.indexer.toLowerCase() : '';
+                
+                return title.includes(filterText) || 
+                       indexer.includes(filterText);
+            });
+        }
     }
     
-    displayResults(currentResults);
+    if (currentSearchType === 'edzk') {
+        displayResults(currentResults);
+    } else {
+        displayProwlarrResults(currentResults);
+    }
     updateFilterStats();
 }
 
 function clearFilter() {
     document.getElementById('filterInput').value = '';
     currentResults = allResults;
-    displayResults(currentResults);
+    if (currentSearchType === 'edzk') {
+        displayResults(currentResults);
+    } else {
+        displayProwlarrResults(currentResults);
+    }
     updateFilterStats();
 }
 
@@ -195,6 +264,91 @@ function displayResults(results) {
     checkEmuleStatus();
 }
 
+function displayProwlarrResults(results) {
+    const resultsDiv = document.getElementById('results');
+    
+    if (results.length === 0) {
+        resultsDiv.innerHTML = `
+            <div class="no-results">
+                <h2>😕 Aucun résultat</h2>
+                <p>Essayez avec d'autres mots-clés ou ajustez le filtre</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    if (results.length > 1) {
+        html += `<button class="copy-all-button" onclick="copyAllLinks()">📋 Copier tous les liens (${results.length})</button>`;
+    }
+
+    results.forEach((result, index) => {
+        // Formater la date de publication si disponible
+        let publishDate = '';
+        if (result.publish_date) {
+            const date = new Date(result.publish_date);
+            publishDate = date.toLocaleDateString('fr-FR');
+        }
+        
+        // Afficher les seeders/peers si disponibles
+        let seedersInfo = '';
+        if (result.seeders !== undefined && result.seeders !== null && result.seeders > 0) {
+            seedersInfo = `🌱 ${result.seeders}`;
+        }
+        if (result.peers !== undefined && result.peers !== null && result.peers > 0) {
+            seedersInfo += (seedersInfo ? ' | ' : '') + `👥 ${result.peers}`;
+        }
+        
+        html += `
+            <div class="result-card">
+                <div class="result-content">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div class="result-title">${result.title}</div>
+                            <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap;">
+                                <span class="result-indexer" style="background: #42a5f5; color: white; padding: 4px 12px; border-radius: 5px; font-size: 0.9em; font-weight: 600;">
+                                    🔍 ${result.indexer || 'Prowlarr'}
+                                </span>
+                                ${publishDate ? `
+                                    <span style="color: #999; font-size: 0.9em;">
+                                        📅 ${publishDate}
+                                    </span>
+                                ` : ''}
+                                ${seedersInfo ? `
+                                    <span style="color: #999; font-size: 0.9em;">
+                                        ${seedersInfo}
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${result.description ? 
+                        `<div class="description" style="margin-top: 10px;">${result.description}</div>` 
+                        : ''
+                    }
+                    
+                    <div class="file-info" style="margin-top: 15px;">
+                        <div class="file-item">
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <div class="file-name" title="${result.title}">${result.title}</div>
+                            </div>
+                            ${result.size ? `<div class="file-size">${formatBytes(result.size)}</div>` : ''}
+                            ${result.download_url ? `
+                                <a href="${result.download_url}" target="_blank" class="add-button" style="text-decoration: none; background: #28a745;">
+                                    🔗 Ouvrir
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    resultsDiv.innerHTML = html;
+}
+
 // Fonction pour échapper les caractères spéciaux dans les attributs HTML
 function escapeForAttribute(text) {
     return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -215,7 +369,12 @@ async function copyLink(link, button) {
 }
 
 async function copyAllLinks() {
-    const links = currentResults.map(r => r.link).join('\n');
+    let links = '';
+    if (currentSearchType === 'edzk') {
+        links = currentResults.map(r => r.link).join('\n');
+    } else {
+        links = currentResults.map(r => r.download_url || r.link || r.guid).filter(l => l).join('\n');
+    }
     try {
         await navigator.clipboard.writeText(links);
         alert(`✓ ${currentResults.length} liens copiés dans le presse-papier!`);

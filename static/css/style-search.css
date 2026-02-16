@@ -92,6 +92,11 @@ body {
     border-color: #667eea;
 }
 
+.search-buttons-group {
+    display: flex;
+    gap: 10px;
+}
+
 .search-button {
     padding: 15px 40px;
     font-size: 1.1em;
@@ -102,11 +107,21 @@ body {
     cursor: pointer;
     font-weight: bold;
     transition: transform 0.2s;
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-button-prowlarr {
+    background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
 }
 
 .search-button:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.search-button-prowlarr:hover {
+    box-shadow: 0 5px 15px rgba(66, 165, 245, 0.4);
 }
 
 .search-button:active {

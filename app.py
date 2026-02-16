@@ -28,12 +28,14 @@ def create_app(config_name='default'):
     from blueprints.search import search_bp
     from blueprints.emule import emule_bp
     from blueprints.ebdz import ebdz_bp
+    from blueprints.prowlarr import prowlarr_bp
     from blueprints.settings import settings_bp
     
     app.register_blueprint(library_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(emule_bp, url_prefix='/api/emule')
     app.register_blueprint(ebdz_bp, url_prefix='/api/ebdz')
+    app.register_blueprint(prowlarr_bp, url_prefix='/api/prowlarr')
     app.register_blueprint(settings_bp)
     
     return app

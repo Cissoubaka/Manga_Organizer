@@ -1,8 +1,10 @@
 # Utiliser une image Debian complète pour avoir accès à plus de paquets
 FROM debian:bookworm
 
-# Améliorer la robustesse des téléchargements APT avec retries et timeout
-RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
+# Configurer les sources APT pour inclure contrib et non-free
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
 
 # Installer Python et les dépendances système (avec retries en cas d'erreur réseau)
 RUN apt-get install -y --no-install-recommends \
@@ -15,13 +17,10 @@ RUN apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     wget \
-    && rm -rf /var/lib/apt/lists/*
-
 # Essayer d'installer amule-utils depuis les dépôts avec retries, sinon compiler
 RUN apt-get update -o Acquire::Retries=3 && \
     (apt-get install -y --no-install-recommends amule-utils && echo "✓ amule-utils installé depuis apt" || \
     (echo "Compilation d'aMule..." && \
-    apt-get update -o Acquire::Retries=3 && \
     apt-get install -y --no-install-recommends \
     build-essential \
     libssl-dev \

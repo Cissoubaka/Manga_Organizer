@@ -1,10 +1,8 @@
 # Utiliser une image Debian complète pour avoir accès à plus de paquets
 FROM debian:bookworm
 
-# Configurer les DNS et sources APT pour une meilleure stabilité réseau
-RUN echo 'nameserver 8.8.8.8' > /etc/resolv.conf && \
-    echo 'nameserver 1.1.1.1' >> /etc/resolv.conf && \
-    apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
+# Améliorer la robustesse des téléchargements APT avec retries et timeout
+RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
 
 # Installer Python et les dépendances système (avec retries en cas d'erreur réseau)
 RUN apt-get install -y --no-install-recommends \

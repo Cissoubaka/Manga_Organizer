@@ -54,7 +54,12 @@ function displaySeries(series) {
     grid.innerHTML = series.map(s => `
         <div class="series-card" onclick="viewSeries(${s.id})">
             <div class="series-title">${escapeHtml(s.title)}</div>
-            <div class="series-info">📖 ${s.total_volumes} volume(s)</div>
+            ${s.nautiljon_total_volumes ? `
+                <div class="series-info" style="color: #667eea; font-weight: 500;">
+                    🌊 ${s.nautiljon_total_volumes} volumes (Nautiljon)
+                </div>
+            ` : ''}
+            <div class="series-info">📖 ${s.total_volumes} volume(s) local</div>
             <div class="series-info">📅 Dernier scan: ${new Date(s.last_scanned).toLocaleDateString('fr-FR')}</div>
             ${s.missing_volumes.length > 0 ? 
                 `<div class="missing-volumes">⚠️ Volumes manquants: ${s.missing_volumes.join(', ')}</div>` :
@@ -135,6 +140,72 @@ async function viewSeries(seriesId) {
         // Sauvegarder le titre de la série pour la recherche
         currentSeriesTitle = data.title;
 
+        // ===== SECTION NAUTILJON =====
+        let nautiljonHtml = '';
+        if (data.nautiljon && data.nautiljon.url) {
+            nautiljonHtml = `
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <h3 style="margin: 0 0 15px 0;">🌊 Informations Nautiljon</h3>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; font-size: 0.95em;">
+                                ${data.nautiljon.total_volumes ? `
+                                    <div>
+                                        <strong>Volumes Totaux:</strong>
+                                        <div>${data.nautiljon.total_volumes}</div>
+                                    </div>
+                                ` : ''}
+                                ${data.nautiljon.french_volumes ? `
+                                    <div>
+                                        <strong>Tomes Français:</strong>
+                                        <div>${data.nautiljon.french_volumes}</div>
+                                    </div>
+                                ` : ''}
+                                ${data.nautiljon.editor ? `
+                                    <div style="grid-column: 1/-1;">
+                                        <strong>Éditeur:</strong>
+                                        <div>${data.nautiljon.editor}</div>
+                                    </div>
+                                ` : ''}
+                                ${data.nautiljon.mangaka ? `
+                                    <div style="grid-column: 1/-1;">
+                                        <strong>Mangaka:</strong>
+                                        <div>${data.nautiljon.mangaka}</div>
+                                    </div>
+                                ` : ''}
+                                ${data.nautiljon.status ? `
+                                    <div>
+                                        <strong>Statut:</strong>
+                                        <div>${data.nautiljon.status}</div>
+                                    </div>
+                                ` : ''}
+                                ${data.nautiljon.year_start ? `
+                                    <div>
+                                        <strong>Années:</strong>
+                                        <div>${data.nautiljon.year_start}${data.nautiljon.year_end ? ` - ${data.nautiljon.year_end}` : ''}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <a href="${data.nautiljon.url}" target="_blank" class="btn" style="background: white; color: #667eea; white-space: nowrap; margin-left: 15px;">
+                            ↗️ Nautiljon
+                        </a>
+                    </div>
+                </div>
+            `;
+        } else {
+            nautiljonHtml = `
+                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                    <p style="margin: 0;">
+                        ⚠️ Pas d'informations Nautiljon
+                        <button class="btn" onclick="enrichSeriesFromModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')">
+                            ✨ Enrichir
+                        </button>
+                    </p>
+                </div>
+            `;
+        }
+
         let volumesHtml = '';
         
         if (data.has_parts && data.parts) {
@@ -193,6 +264,7 @@ async function viewSeries(seriesId) {
         }
 
         modalBody.innerHTML = `
+            ${nautiljonHtml}
             <div class="modal-header">
                 <h2 class="modal-title">${escapeHtml(data.title)}</h2>
                 <p class="modal-subtitle">
@@ -230,6 +302,36 @@ async function viewSeries(seriesId) {
         });
     } catch (error) {
         modalBody.innerHTML = `<div class="no-data"><h3>Erreur</h3><p>${error.message}</p></div>`;
+    }
+}
+
+// Fonction pour enrichir une série depuis le modal
+async function enrichSeriesFromModal(seriesId, seriesTitle) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ Enrichissement...';
+
+    try {
+        // Importe l'API Nautiljon si disponible
+        if (typeof NautiljonAPI !== 'undefined') {
+            const result = await NautiljonAPI.enrichSeries(seriesId, seriesTitle, 'title');
+            
+            if (result.success) {
+                btn.textContent = '✅ Enrichi!';
+                // Recharger le modal
+                setTimeout(() => {
+                    viewSeries(seriesId);
+                    btn.disabled = false;
+                }, 1000);
+            } else {
+                btn.textContent = '❌ Erreur';
+                btn.disabled = false;
+            }
+        }
+    } catch (error) {
+        btn.textContent = '❌ Erreur';
+        btn.disabled = false;
+        console.error('Erreur enrichissement:', error);
     }
 }
 

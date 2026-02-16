@@ -1,0 +1,380 @@
+/**
+ * Nautiljon UI Styles
+ */
+
+/* Nautiljon Info Card */
+.nautiljon-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 20px;
+    color: white;
+    margin: 20px 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.nautiljon-card h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nautiljon-card .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.nautiljon-card .info-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 6px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nautiljon-card .info-item .label {
+    display: block;
+    font-size: 0.9em;
+    opacity: 0.9;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.nautiljon-card .info-item .value {
+    display: block;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.nautiljon-card .info-item .status-en-cours {
+    background: #4ade80;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.nautiljon-card .info-item .status-terminé {
+    background: #3b82f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.nautiljon-card .info-item .status-pausé {
+    background: #f59e0b;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.nautiljon-card .action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.nautiljon-card .action-buttons a,
+.nautiljon-card .action-buttons button {
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.nautiljon-card .action-buttons a:hover,
+.nautiljon-card .action-buttons button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.nautiljon-card .updated-at {
+    display: block;
+    margin-top: 10px;
+    opacity: 0.8;
+    font-size: 0.85em;
+}
+
+.nautiljon-card .no-data {
+    text-align: center;
+    padding: 20px;
+    opacity: 0.7;
+}
+
+/* Nautiljon Enrichment Modal */
+.modal.nautiljon-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal.nautiljon-progress .modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+.modal.nautiljon-progress h2 {
+    margin-top: 0;
+    color: #667eea;
+    text-align: center;
+}
+
+.modal.nautiljon-progress .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.modal.nautiljon-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+}
+
+.modal.nautiljon-progress .progress-text {
+    text-align: center;
+    font-weight: 500;
+    color: #374151;
+    margin: 15px 0;
+}
+
+.modal.nautiljon-progress button {
+    width: 100%;
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 15px;
+    transition: background 0.3s ease;
+}
+
+.modal.nautiljon-progress button:hover {
+    background: #764ba2;
+}
+
+/* Nautiljon Search Widget */
+.nautiljon-search-widget {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.nautiljon-search-widget label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.nautiljon-search-widget input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1em;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+.nautiljon-search-widget input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.nautiljon-search-widget button {
+    width: 100%;
+    padding: 10px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.nautiljon-search-widget button:hover {
+    background: #764ba2;
+}
+
+.nautiljon-search-results {
+    margin-top: 15px;
+}
+
+.nautiljon-search-results .result-item {
+    background: white;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 4px solid #667eea;
+}
+
+.nautiljon-search-results .result-item:hover {
+    background: #f9fafb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateX(4px);
+}
+
+.nautiljon-search-results .result-title {
+    font-weight: 500;
+    color: #667eea;
+}
+
+.nautiljon-search-results .result-url {
+    font-size: 0.85em;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* Enrichment Buttons */
+.btn-enrichment {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-enrichment:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-enrichment:active {
+    transform: translateY(0);
+}
+
+.btn-enrichment.loading::after {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid white;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.6s linear infinite;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .nautiljon-card .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal.nautiljon-progress .modal-content {
+        margin: 20px;
+        max-width: calc(100% - 40px);
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .nautiljon-card {
+        background: linear-gradient(135deg, #4c1d95 0%, #312e81 100%);
+    }
+
+    .nautiljon-search-widget {
+        background: #1f2937;
+    }
+
+    .nautiljon-search-widget label {
+        color: #e5e7eb;
+    }
+
+    .nautiljon-search-widget input {
+        background: #374151;
+        color: white;
+        border-color: #4b5563;
+    }
+
+    .nautiljon-search-results .result-item {
+        background: #1f2937;
+        color: white;
+    }
+
+    .nautiljon-search-results .result-item:hover {
+        background: #374151;
+    }
+
+    .modal.nautiljon-progress .modal-content {
+        background: #1f2937;
+        color: white;
+    }
+
+    .modal.nautiljon-progress h2 {
+        color: #a78bfa;
+    }
+
+    .modal.nautiljon-progress .progress-bar {
+        background: #4b5563;
+    }
+
+    .modal.nautiljon-progress .progress-text {
+        color: #e5e7eb;
+    }
+}

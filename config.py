@@ -120,7 +120,43 @@ class Config:
         ''')
         
         conn.commit()
+        
+        # Ajouter les colonnes Nautiljon si elles n'existent pas
+        Config._add_nautiljon_columns(conn, db_path)
+        
         conn.close()
+
+    @staticmethod
+    def _add_nautiljon_columns(conn, db_path):
+        """Ajoute les colonnes Nautiljon à la table series si elles n'existent pas"""
+        cursor = conn.cursor()
+        
+        nautiljon_columns = [
+            ('nautiljon_url', 'TEXT'),
+            ('nautiljon_total_volumes', 'INTEGER'),
+            ('nautiljon_french_volumes', 'INTEGER'),
+            ('nautiljon_editor', 'TEXT'),
+            ('nautiljon_status', 'TEXT'),
+            ('nautiljon_mangaka', 'TEXT'),
+            ('nautiljon_year_start', 'INTEGER'),
+            ('nautiljon_year_end', 'INTEGER'),
+            ('nautiljon_updated_at', 'TIMESTAMP')
+        ]
+        
+        # Vérifier quelles colonnes existent
+        cursor.execute("PRAGMA table_info(series)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        
+        # Ajouter les colonnes manquantes
+        for col_name, col_type in nautiljon_columns:
+            if col_name not in existing_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE series ADD COLUMN {col_name} {col_type}")
+                except sqlite3.OperationalError as e:
+                    if 'already exists' not in str(e):
+                        print(f"⚠️  Impossible d'ajouter {col_name}: {e}")
+        
+        conn.commit()
 
 
 class DevelopmentConfig(Config):

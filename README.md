@@ -8,7 +8,7 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 - 📥 Intégration aMule/eMule pour les téléchargements
 - 🎨 Interface web intuitive
 - 🔐 Chiffrement des données sensibles
-- 🐳 Support Docker complet
+- 🐳 Support Docker complet (en cours)
 
 ---
 
@@ -32,7 +32,7 @@ docker-compose up -d --build
 # http://localhost:5000
 ```
 
-### Installation locale (sans Docker)
+### Installation locale (sans Docker) [à privilégier]
 
 ```bash
 # 1. Cloner le projet
@@ -448,6 +448,101 @@ Les contributions sont bienvenues ! Pour contribuer :
 4. Push la branche (`git push origin feature/amélioration`)
 5. Ouvrir une Pull Request
 
+
+
+---
+
+## 🌊 Nautiljon Integration
+
+Manga Organizer now includes direct integration with **Nautiljon.com**, the reference French manga database! 
+
+### Features
+
+✨ **Automatic Enrichment** - Enrich your series with metadata during or after scanning
+🔍 **Smart Search** - Fuzzy search to find your manga on Nautiljon
+📊 **Detailed Info** - Get volume counts, French publisher, mangaka, and publication dates
+⚡ **Batch Operations** - Enrich multiple series at once
+📌 **Persistent Storage** - All Nautiljon data is saved to your database
+
+### Quick Start
+
+#### Option 1: Auto-Enrich During Scan
+
+```bash
+# Scan library and automatically enrich with Nautiljon data
+POST /api/scan/1 with body: {"auto_enrich": true}
+```
+
+#### Option 2: Manual Enrichment
+
+```bash
+# Enrich a specific series
+POST /api/nautiljon/enrich/1
+{
+  "search_by": "title",
+  "value": "One Piece"
+}
+```
+
+#### Option 3: Batch Enrichment
+
+```bash
+# Enrich multiple series at once
+POST /api/nautiljon/batch-enrich
+{
+  "series_ids": [1, 2, 3, 4, 5]
+}
+```
+
+### Data Retrieved
+
+- 📈 **Total Volumes** - Worldwide volume count
+- 🇫🇷 **French Volumes** - How many published in French
+- 📕 **French Publisher** - Éditeur (Glénat, Kazé, etc.)
+- 👨 **Mangaka** - Author/Creator
+- 🔄 **Status** - En cours, Terminé, Pausé
+- 📅 **Years** - Publication start and end years
+
+### API Endpoints
+
+See [NAUTILJON.md](NAUTILJON.md) for complete API documentation.
+
+```
+GET  /api/nautiljon/search?q=manga_title      - Search for manga
+GET  /api/nautiljon/info?title=...or url=...  - Get manga details
+POST /api/nautiljon/enrich/<series_id>        - Enrich a series
+POST /api/nautiljon/batch-enrich              - Batch enrich series
+GET  /api/series/<series_id>                  - Get series with Nautiljon data
+```
+
+### Frontend Integration
+
+Include the Nautiljon JavaScript library in your templates:
+
+```html
+<script src="/static/js/nautiljon.js"></script>
+<link rel="stylesheet" href="/static/css/style-nautiljon.css">
+```
+
+Example usage:
+
+```javascript
+// Search for manga
+const results = await NautiljonAPI.searchManga("One Piece");
+
+// Get manga details
+const info = await NautiljonAPI.getMangaInfo("One Piece");
+
+// Enrich a series
+const result = await NautiljonAPI.enrichSeries(1, "One Piece", "title");
+
+// Display info card
+NautiljonAPI.displayInfoCard(info, document.getElementById('info-container'));
+
+// Batch enrich with progress
+await NautiljonAPI.showEnrichmentProgress([1, 2, 3, 4, 5]);
+```
+
 ---
 
 ## 📄 Licence
@@ -463,6 +558,7 @@ Ce projet est sous licence [À définir].
 - ❌ EBDZ : captcha CLOUDFLARE bloque parfois le scraping
 - ❌ Unicode : certains noms de mangas avec caractères spéciaux
 - ⚠️ Performance : scanner 10k+ fichiers peut être lent (utiliser import par lot)
+- ⚠️ Nautiljon : les mangas très récents peuvent ne pas être trouvés
 
 ### Signaler un bug
 
@@ -480,17 +576,20 @@ Ouvrez une issue GitHub avec :
 - [Docker Documentation](https://docs.docker.com/)
 - [SQLite](https://www.sqlite.org/)
 - [EBDZ.net](https://ebdz.net/) - Forum francophone mangas
+- [Nautiljon.com](https://www.nautiljon.com/) - French manga reference database
 
 ---
 
 ## 🎯 Roadmap
 
+- [x] Integration with Nautiljon.com
 - [ ] Interface API REST complète
 - [ ] Support intégrations supplémentaires (Komga, etc.)
 - [ ] Amélioration détection doublons
 - [ ] Support multi-langue complète
 - [ ] Dashboard statistiques
 - [ ] Notifications temps réel
+- [ ] Web UI for Nautiljon search and enrichment
 
 ---
 

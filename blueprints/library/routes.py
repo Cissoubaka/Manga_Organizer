@@ -18,6 +18,12 @@ def get_db_connection():
 
 # ========== ROUTES HTML ==========
 
+@library_bp.route('/nautiljon')
+def nautiljon_page():
+    """Page d'enrichissement Nautiljon"""
+    return render_template('nautiljon.html')
+
+
 @library_bp.route('/')
 def index():
     """Page d'accueil - Liste des bibliothèques"""
@@ -163,11 +169,22 @@ def library_operations(library_id):
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@library_bp.route('/api/scan/<int:library_id>', methods=['GET'])
+@library_bp.route('/api/scan/<int:library_id>', methods=['GET', 'POST'])
 def scan_library(library_id):
-    """Scanne une bibliothèque"""
+    """Scanne une bibliothèque
+    
+    GET/POST params:
+    - auto_enrich (optional, bool): Enrichir les séries avec Nautiljon
+    """
     
     try:
+        # Support GET et POST
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            auto_enrich = data.get('auto_enrich', False)
+        else:
+            auto_enrich = request.args.get('auto_enrich', 'false').lower() == 'true'
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -194,9 +211,9 @@ def scan_library(library_id):
                 'error': f'Le chemin n\'est pas un répertoire: {library_path}'
             }), 400
         
-        # Scanner
+        # Scanner avec enrichissement optionnel
         scanner = LibraryScanner()
-        series_count = scanner.scan_directory(library_id, library_path)
+        series_count = scanner.scan_directory(library_id, library_path, auto_enrich=auto_enrich)
         
         return jsonify({'success': True, 'series_count': series_count})
     
@@ -270,10 +287,13 @@ def get_series_details(series_id):
         conn = sqlite3.connect(current_app.config['DATABASE'])
         cursor = conn.cursor()
 
-        # Récupérer les infos de la série
+        # Récupérer les infos de la série avec les données Nautiljon
         cursor.execute('''
             SELECT s.id, s.title, s.path, s.total_volumes, s.missing_volumes, s.has_parts,
-                   l.id, l.name
+                   l.id, l.name,
+                   s.nautiljon_url, s.nautiljon_total_volumes, s.nautiljon_french_volumes,
+                   s.nautiljon_editor, s.nautiljon_status, s.nautiljon_mangaka,
+                   s.nautiljon_year_start, s.nautiljon_year_end, s.nautiljon_updated_at
             FROM series s
             JOIN libraries l ON s.library_id = l.id
             WHERE s.id = ?
@@ -324,6 +344,17 @@ def get_series_details(series_id):
             'library': {
                 'id': series_row[6],
                 'name': series_row[7]
+            },
+            'nautiljon': {
+                'url': series_row[8],
+                'total_volumes': series_row[9],
+                'french_volumes': series_row[10],
+                'editor': series_row[11],
+                'status': series_row[12],
+                'mangaka': series_row[13],
+                'year_start': series_row[14],
+                'year_end': series_row[15],
+                'updated_at': series_row[16]
             },
             'volumes': volumes
         })

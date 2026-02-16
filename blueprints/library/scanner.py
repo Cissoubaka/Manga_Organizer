@@ -15,6 +15,9 @@ import io
 from collections import defaultdict
 import json
 from flask import current_app
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LibraryScanner:
@@ -80,7 +83,42 @@ class LibraryScanner:
         ''')
 
         conn.commit()
+        
+        # Ajouter les colonnes Nautiljon si elles n'existent pas
+        self._add_nautiljon_columns(conn)
+        
         conn.close()
+    
+    def _add_nautiljon_columns(self, conn):
+        """Ajoute les colonnes Nautiljon à la table series si elles n'existent pas"""
+        cursor = conn.cursor()
+        
+        nautiljon_columns = [
+            ('nautiljon_url', 'TEXT'),
+            ('nautiljon_total_volumes', 'INTEGER'),
+            ('nautiljon_french_volumes', 'INTEGER'),
+            ('nautiljon_editor', 'TEXT'),
+            ('nautiljon_status', 'TEXT'),
+            ('nautiljon_mangaka', 'TEXT'),
+            ('nautiljon_year_start', 'INTEGER'),
+            ('nautiljon_year_end', 'INTEGER'),
+            ('nautiljon_updated_at', 'TIMESTAMP')
+        ]
+        
+        # Vérifier quelles colonnes existent
+        cursor.execute("PRAGMA table_info(series)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        
+        # Ajouter les colonnes manquantes
+        for col_name, col_type in nautiljon_columns:
+            if col_name not in existing_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE series ADD COLUMN {col_name} {col_type}")
+                    logger.info(f"Colonne {col_name} ajoutée à la table series")
+                except sqlite3.OperationalError as e:
+                    logger.warning(f"Impossible d'ajouter la colonne {col_name}: {e}")
+        
+        conn.commit()
 
     def parse_filename(self, filename):
         """Parse le nom de fichier pour extraire les métadonnées"""
@@ -98,7 +136,7 @@ class LibraryScanner:
         # Retirer l'extension pour faciliter le parsing
         name_without_ext = os.path.splitext(filename)[0]
 
-        # AMÉLIORATION: Normaliser le nom en remplaçant les points et underscores par des espaces
+        # AMÉLIORATION: Normaliser le nom en remplaçant les points, underscores et caractères spéciaux par des espaces
         # Sauf pour les points dans les nombres (comme 1.5)
         # On garde aussi les points dans les patterns spéciaux comme "Vol." ou "T.01"
         normalized_name = name_without_ext
@@ -106,8 +144,10 @@ class LibraryScanner:
         # Remplacer les points par des espaces, sauf si précédés/suivis d'un chiffre
         normalized_name = re.sub(r'\.(?!\d)', ' ', normalized_name)  # Point non suivi d'un chiffre
         normalized_name = re.sub(r'(?<!\d)\.', ' ', normalized_name)  # Point non précédé d'un chiffre
-        normalized_name = re.sub(r'_', ' ', normalized_name)  # Underscores
-
+        
+        # Remplacer underscores et caractères spéciaux par des espaces
+        normalized_name = re.sub(r'[_!,;:?\[\]{}()«»„""]', ' ', normalized_name)
+        
         # Nettoyer les espaces multiples
         normalized_name = re.sub(r'\s+', ' ', normalized_name).strip()
 
@@ -242,12 +282,17 @@ class LibraryScanner:
 
         return 0
 
-    def scan_directory(self, library_id, library_path):
+    def scan_directory(self, library_id, library_path, auto_enrich=False):
         """Scanne un répertoire pour détecter les séries et volumes
         
         CORRECTION DU BUG:
         - Les sous-répertoires directs de library_path sont les séries
         - Les fichiers dans chaque sous-répertoire sont les volumes de cette série
+        
+        Args:
+            library_id: ID de la bibliothèque
+            library_path: Chemin du répertoire à scanner
+            auto_enrich: Si True, enrichit les séries détectées avec les infos Nautiljon
         """
         print(f"\n📂 Scan du répertoire: {library_path}")
 
@@ -496,6 +541,16 @@ class LibraryScanner:
         ''', (library_id,))
 
         conn.commit()
+        
+        # Enrichissement automatique Nautiljon si demandé
+        if auto_enrich:
+            print("\n🔍 Enrichissement Nautiljon en cours...")
+            cursor.execute('SELECT id, title FROM series WHERE library_id = ?', (library_id,))
+            series_list = cursor.fetchall()
+            
+            for series_id, series_title in series_list:
+                self.enrich_series_with_nautiljon(series_id, series_title, conn)
+        
         conn.close()
 
         return len(series_data)
@@ -573,6 +628,73 @@ class LibraryScanner:
             conn.commit()
             conn.close()
 
+    def enrich_series_with_nautiljon(self, series_id, series_title, conn=None):
+        """
+        Enrichit une série avec les infos Nautiljon
+        
+        Args:
+            series_id: ID de la série
+            series_title: Titre de la série (utilisé pour la recherche)
+            conn: Connexion SQLite (optionnel)
+        """
+        close_conn = False
+        if conn is None:
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            close_conn = True
+        
+        try:
+            # Importe le scraper Nautiljon
+            from blueprints.nautiljon.scraper import NautiljonScraper
+            
+            scraper = NautiljonScraper()
+            cursor = conn.cursor()
+            
+            # Cherche les infos Nautiljon
+            info = scraper.search_and_get_best_match(series_title)
+            
+            if info:
+                # Met à jour la série avec les infos Nautiljon
+                cursor.execute('''
+                    UPDATE series SET
+                        nautiljon_url = ?,
+                        nautiljon_total_volumes = ?,
+                        nautiljon_french_volumes = ?,
+                        nautiljon_editor = ?,
+                        nautiljon_status = ?,
+                        nautiljon_mangaka = ?,
+                        nautiljon_year_start = ?,
+                        nautiljon_year_end = ?,
+                        nautiljon_updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (
+                    info.get('url'),
+                    info.get('total_volumes'),
+                    info.get('french_volumes'),
+                    info.get('editor'),
+                    info.get('status'),
+                    info.get('mangaka'),
+                    info.get('year_start'),
+                    info.get('year_end'),
+                    series_id
+                ))
+                
+                if close_conn:
+                    conn.commit()
+                
+                print(f"  ✓ Nautiljon: {series_title} - {info.get('total_volumes', '?')} volumes")
+                logger.info(f"Infos Nautiljon récupérées pour: {series_title}")
+            else:
+                print(f"  ⚠️  Nautiljon: Pas trouvé pour {series_title}")
+                logger.info(f"Pas d'infos Nautiljon trouvées pour: {series_title}")
+        
+        except ImportError:
+            logger.warning("Module Nautiljon non disponible")
+        except Exception as e:
+            logger.error(f"Erreur lors de l'enrichissement Nautiljon pour {series_id}: {e}")
+        
+        finally:
+            if close_conn:
+                conn.close()
 
     def get_library_stats(self, library_id):
         """Récupère les statistiques d'une bibliothèque"""

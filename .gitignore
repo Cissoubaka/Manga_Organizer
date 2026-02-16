@@ -23,7 +23,7 @@ wheels/
 .installed.cfg
 *.egg
 data/
-.env*
+.env
 
 # Flask
 instance/

@@ -1,8 +1,13 @@
 # Utiliser une image Debian complète pour avoir accès à plus de paquets
 FROM debian:bookworm
 
-# Installer Python et les dépendances système
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Configurer les DNS et sources APT pour une meilleure stabilité réseau
+RUN echo 'nameserver 8.8.8.8' > /etc/resolv.conf && \
+    echo 'nameserver 1.1.1.1' >> /etc/resolv.conf && \
+    apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
+
+# Installer Python et les dépendances système (avec retries en cas d'erreur réseau)
+RUN apt-get install -y --no-install-recommends \
     python3.11 \
     python3-pip \
     p7zip-full \
@@ -10,14 +15,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     unrar-free \
     ca-certificates \
+    curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Essayer d'installer amule-utils depuis les dépôts, sinon compiler
-RUN apt-get update && \
+# Essayer d'installer amule-utils depuis les dépôts avec retries, sinon compiler
+RUN apt-get update -o Acquire::Retries=3 && \
     (apt-get install -y --no-install-recommends amule-utils && echo "✓ amule-utils installé depuis apt" || \
     (echo "Compilation d'aMule..." && \
+    apt-get update -o Acquire::Retries=3 && \
     apt-get install -y --no-install-recommends \
-    wget \
     build-essential \
     libssl-dev \
     pkg-config \
@@ -25,7 +32,7 @@ RUN apt-get update && \
     automake \
     libtool && \
     cd /tmp && \
-    wget -q https://github.com/amule-project/amule/releases/download/2.3.3/aMule-2.3.3.tar.gz && \
+    wget -q --retry-connrefused --tries=5 https://github.com/amule-project/amule/releases/download/2.3.3/aMule-2.3.3.tar.gz && \
     tar -xzf aMule-2.3.3.tar.gz && \
     cd aMule-2.3.3 && \
     ./configure --prefix=/usr/local --disable-gui --disable-webserver --disable-amule-daemon > /dev/null 2>&1 && \
@@ -33,7 +40,7 @@ RUN apt-get update && \
     make install > /dev/null 2>&1 && \
     cd / && \
     rm -rf /tmp/aMule-2.3.3* && \
-    apt-get remove -y wget build-essential autoconf automake libtool && \
+    apt-get remove -y build-essential autoconf automake libtool && \
     rm -rf /var/lib/apt/lists/* && \
     echo "✓ aMule compilé avec succès")) && \
     which amulecmd

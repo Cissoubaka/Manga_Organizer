@@ -10,7 +10,7 @@ services:
       # Optionnel : montez le répertoire covers séparément pour faciliter les backups
       - ./data/covers:/app/data/covers
       # montez le répertoire contenant les bibliothèques
-      - /media/media2/KOMGA/:/library
+      - /path/to/library/:/library
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}

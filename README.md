@@ -14,7 +14,7 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 
 ## 🚀 Démarrage rapide
 
-### Avec Docker (non fonctionnel pour le moment)
+### Avec Docker
 
 ```bash
 # 1. Cloner le projet
@@ -32,7 +32,47 @@ docker-compose up -d --build
 # http://localhost:5000
 ```
 
-### Installation locale (sans Docker) [à privilégier]
+### Avec l'image Docker Hub
+
+```bash
+# 1. Cloner le projet (pour les fichiers de configuration)
+git clone https://github.com/Cissoubaka/Manga_Organizer.git
+cd Manga_Organizer
+
+# 2. Configurer l'environnement
+cp .env.example .env
+# Éditer .env si nécessaire
+
+# 3. Télécharger et démarrer l'image publiée
+docker pull cissoubaka/manga-organizer:latest
+
+# 4. Exécuter le conteneur
+docker run -d \
+  --name manga-organizer \
+  -p 5000:5000 \
+  -v ./data:/app/data \
+  -v /path/to/library:/library \
+  -e FLASK_ENV=production \
+  -e SECRET_KEY=your-secret-key \
+  -e AMULE_HOST=host.docker.internal \
+  cissoubaka/manga-organizer:latest
+
+# 5. Accéder à l'application
+# http://localhost:5000
+```
+
+Ou avec `docker-compose` en modifiant le `docker-compose.yml` :
+
+```yaml
+services:
+  manga-organizer:
+    image: cissoubaka/manga-organizer:latest  # Utiliser l'image du Hub
+    # Si vous voulez construire localement, remplacez par : build: .
+    container_name: manga-organizer
+    # ... reste de la configuration
+```
+
+### Installation locale (sans Docker)
 
 ```bash
 # 1. Cloner le projet

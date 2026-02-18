@@ -1,0 +1,24 @@
+services:
+  manga-organizer:
+    container_name: manga-organizer
+    ports:
+      - "5000:5000"
+    volumes:
+      # Montez le répertoire data pour la persistance
+      - ./data:/app/data
+      # Optionnel : montez le répertoire covers séparément pour faciliter les backups
+      - ./data/covers:/app/data/covers
+      # montez le répertoire contenant les bibliothèques
+      - /path/to/library/:/library
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
+      # Configuration aMule - adresse IP de la machine aMule
+      - AMULE_HOST=${AMULE_HOST:-host.docker.internal}
+    restart: unless-stopped
+    # Optionnel : limiter les ressources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 512M

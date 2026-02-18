@@ -7,6 +7,7 @@ from .scanner import LibraryScanner
 import sqlite3
 import json
 import os
+import time
 
 
 def get_db_connection():
@@ -273,6 +274,9 @@ def enrich_library(library_id):
                 failed_count += 1
                 logger.error(f"Erreur enrichissement {series_title}: {e}")
                 print(f"❌ Erreur: {series_title} - {e}")
+            
+            # Respecter les délais pour éviter de surcharger Nautiljon
+            time.sleep(5)
         
         return jsonify({
             'success': True,

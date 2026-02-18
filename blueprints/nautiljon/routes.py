@@ -6,6 +6,7 @@ from . import nautiljon_bp
 from .scraper import NautiljonScraper, NautiljonDatabase
 import sqlite3
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +375,9 @@ def batch_enrich_series():
                     'id': series_id,
                     'error': str(e)
                 })
+            
+            # Respecter les délais pour éviter de surcharger Nautiljon
+            time.sleep(5)
         
         conn.close()
         

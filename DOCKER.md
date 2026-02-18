@@ -49,6 +49,74 @@ docker stop manga-organizer
 docker rm manga-organizer
 ```
 
+## Utilisation de l'image Docker Hub
+
+### Option 3 : Avec `docker run` (image pré-construite)
+
+Télécharger et exécuter l'image publiée sur Docker Hub :
+
+```bash
+docker run -d \
+  --name manga-organizer \
+  -p 5000:5000 \
+  -v ./data:/app/data \
+  -v /path/to/library:/library \
+  -e FLASK_ENV=production \
+  -e SECRET_KEY=your-secret-key \
+  -e AMULE_HOST=host.docker.internal \
+  cissoubaka/manga-organizer:latest
+```
+
+### Option 4 : Avec Docker Compose et l'image Hub
+
+**Créer un fichier `.env`** :
+
+```bash
+# Clé secrète Flask - À modifier en production
+SECRET_KEY=your-secure-secret-key-here
+
+# Configuration Flask
+FLASK_ENV=production
+
+# Port (optionnel, défaut 5000)
+# FLASK_PORT=5000
+
+# Configuration aMule - Adresse IP de la machine qui exécute aMule
+# Laissez vide pour utiliser host.docker.internal (si aMule est sur la même machine que Docker)
+# Sinon, mettez l'adresse IP de la machine aMule (ex: 192.168.1.2)
+AMULE_HOST=192.168.1.2
+```
+
+**Créer un fichier `docker-compose.yml`** :
+
+```yaml
+services:
+  manga-organizer:
+    image: cissoubaka/manga-organizer:latest
+    container_name: manga-organizer
+    ports:
+      - "5000:5000"
+    volumes:
+      # Montez le répertoire data pour la persistance
+      - ./data:/app/data
+      # Optionnel : montez le répertoire covers séparément pour faciliter les backups
+      - ./data/covers:/app/data/covers
+      # montez le répertoire contenant les bibliothèques
+      - /path/to/library/:/library
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
+      # Configuration aMule - adresse IP de la machine aMule
+      - AMULE_HOST=${AMULE_HOST:-host.docker.internal}
+    restart: unless-stopped
+```
+
+**Démarrer l'application** :
+
+```bash
+docker compose up -d
+```
+
 ## Commandes utiles
 
 ### Voir les logs

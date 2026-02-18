@@ -17,30 +17,7 @@ RUN apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     wget \
-# Essayer d'installer amule-utils depuis les dépôts avec retries, sinon compiler
-RUN apt-get update -o Acquire::Retries=3 && \
-    (apt-get install -y --no-install-recommends amule-utils && echo "✓ amule-utils installé depuis apt" || \
-    (echo "Compilation d'aMule..." && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    libssl-dev \
-    pkg-config \
-    autoconf \
-    automake \
-    libtool && \
-    cd /tmp && \
-    wget -q --retry-connrefused --tries=5 https://github.com/amule-project/amule/releases/download/2.3.3/aMule-2.3.3.tar.gz && \
-    tar -xzf aMule-2.3.3.tar.gz && \
-    cd aMule-2.3.3 && \
-    ./configure --prefix=/usr/local --disable-gui --disable-webserver --disable-amule-daemon > /dev/null 2>&1 && \
-    make -j$(nproc) > /dev/null 2>&1 && \
-    make install > /dev/null 2>&1 && \
-    cd / && \
-    rm -rf /tmp/aMule-2.3.3* && \
-    apt-get remove -y build-essential autoconf automake libtool && \
-    rm -rf /var/lib/apt/lists/* && \
-    echo "✓ aMule compilé avec succès")) && \
-    which amulecmd
+    amule-utils
 
 # Définir le répertoire de travail
 WORKDIR /app

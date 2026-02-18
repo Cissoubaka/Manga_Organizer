@@ -133,6 +133,7 @@ class Config:
         
         nautiljon_columns = [
             ('nautiljon_url', 'TEXT'),
+            ('nautiljon_cover_path', 'TEXT'),
             ('nautiljon_total_volumes', 'INTEGER'),
             ('nautiljon_french_volumes', 'INTEGER'),
             ('nautiljon_editor', 'TEXT'),

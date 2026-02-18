@@ -1,6 +1,7 @@
 //const libraryId = {{ library_id }};
 let seriesData = [];
 let showOnlyMissing = false;
+let seriesStatusFilter = 'all'; // 'all', 'completed', 'ongoing'
 let currentSeriesTitle = '';
 
 async function loadLibraryInfo() {
@@ -51,9 +52,16 @@ function displaySeries(series) {
         return;
     }
 
-    grid.innerHTML = series.map(s => `
+    grid.innerHTML = series.map(s => {
+        // Calculer le badge en fonction de la logique complexe
+        const badge = calculateSeriesBadge(s);
+        
+        return `
         <div class="series-card" onclick="viewSeries(${s.id})">
-            <div class="series-title">${escapeHtml(s.title)}</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                <div class="series-title">${escapeHtml(s.title)}</div>
+                ${badge}
+            </div>
             ${s.nautiljon_total_volumes ? `
                 <div class="series-info" style="color: #667eea; font-weight: 500;">
                     🌊 ${s.nautiljon_total_volumes} volumes (Nautiljon)
@@ -66,7 +74,50 @@ function displaySeries(series) {
                 `<div class="complete">✅ Collection complète</div>`
             }
         </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+// Fonction pour calculer le badge d'une série
+function calculateSeriesBadge(series) {
+    // Récupérer les couleurs depuis le localStorage ou utiliser les défauts
+    const colors = JSON.parse(localStorage.getItem('badgeColors')) || {
+        complete: '#10b981',    // vert
+        ongoing: '#ef4444',     // rouge
+        incomplete: '#f59e0b',  // orange
+        missing: '#3b82f6'      // bleu
+    };
+    
+    const hasNautiljonInfo = series.nautiljon_total_volumes;
+    const hasMissingVolumes = series.missing_volumes && series.missing_volumes.length > 0;
+    const isNautiljonComplete = series.nautiljon_status && (
+        series.nautiljon_status.toLowerCase().includes('terminé') || 
+        series.nautiljon_status.toLowerCase().includes('termin')
+    );
+    
+    // Logique des badges
+    // 1. "Finie" : volumes locaux = volumes Nautiljon
+    if (hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes && !hasMissingVolumes) {
+        return `<span class="series-badge" style="background: ${colors.complete}; color: white;">✅ Finie</span>`;
+    }
+    
+    // 2. "Manquant" : série terminée sur Nautiljon ET volumes manquants
+    if (isNautiljonComplete && hasMissingVolumes) {
+        return `<span class="series-badge" style="background: ${colors.missing}; color: white;">📚 Manquant</span>`;
+    }
+    
+    // 3. "Incomplet" : volumes manquants ET série pas terminée sur Nautiljon
+    if (hasMissingVolumes && !isNautiljonComplete) {
+        return `<span class="series-badge" style="background: ${colors.incomplete}; color: white;">⚠️ Incomplet</span>`;
+    }
+    
+    // 4. "En cours" : volumes ne correspondent pas
+    if (hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes) {
+        return `<span class="series-badge" style="background: ${colors.ongoing}; color: white;">🔄 En cours</span>`;
+    }
+    
+    // Pas de badge si pas d'info Nautiljon
+    return '';
 }
 
 function filterSeries() {
@@ -79,7 +130,39 @@ function filterSeries() {
         filtered = filtered.filter(s => s.missing_volumes.length > 0);
     }
     
+    if (seriesStatusFilter === 'completed') {
+        filtered = filtered.filter(s => 
+            s.nautiljon_status && 
+            (s.nautiljon_status.toLowerCase().includes('terminé') || s.nautiljon_status.toLowerCase().includes('termin'))
+        );
+    } else if (seriesStatusFilter === 'ongoing') {
+        filtered = filtered.filter(s => 
+            s.nautiljon_status && 
+            s.nautiljon_status.toLowerCase().includes('cours')
+        );
+    }
+    
     displaySeries(filtered);
+}
+
+function toggleStatusFilter() {
+    const btn = document.getElementById('filter-status-btn');
+    
+    if (seriesStatusFilter === 'all') {
+        seriesStatusFilter = 'completed';
+        btn.textContent = '✅ Séries terminées uniquement';
+        btn.style.background = '#10b981';
+    } else if (seriesStatusFilter === 'completed') {
+        seriesStatusFilter = 'ongoing';
+        btn.textContent = '📖 Séries en cours uniquement';
+        btn.style.background = '#f59e0b';
+    } else {
+        seriesStatusFilter = 'all';
+        btn.textContent = '📚 Toutes les séries';
+        btn.style.background = '#667eea';
+    }
+    
+    filterSeries();
 }
 
 function toggleMissingFilter() {
@@ -98,20 +181,22 @@ function toggleMissingFilter() {
 }
 
 async function scanLibrary() {
-    if (!confirm('Voulez-vous scanner cette bibliothèque ? Cela peut prendre du temps.')) {
-        return;
-    }
-
     const button = event.target;
     button.disabled = true;
     button.textContent = '⏳ Scan en cours...';
 
     try {
-        const response = await fetch(`/api/scan/${libraryId}`);
+        const response = await fetch(`/api/scan/${libraryId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        
         const data = await response.json();
         
         if (data.success) {
-            alert(`✅ Scan terminé ! ${data.series_count} séries trouvées.`);
+            alert(`✅ Scan terminé !\n${data.series_count} séries trouvées.\n\n💡 Utilisez le bouton "Enrichir la bibliothèque" pour récupérer les infos Nautiljon`);
+            await loadLibraryData();
             await loadLibraryData();
         } else {
             alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
@@ -121,6 +206,37 @@ async function scanLibrary() {
     } finally {
         button.disabled = false;
         button.textContent = '🔄 Scanner la bibliothèque';
+    }
+}
+
+async function enrichAllSeries() {
+    if (!confirm('Enrichir toutes les séries sans infos Nautiljon?\n\nCette opération peut prendre du temps...')) {
+        return;
+    }
+    
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = '⏳ Enrichissement en cours...';
+
+    try {
+        const response = await fetch(`/api/library/${libraryId}/enrich`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Enrichissement terminé!\n${data.enriched_count} séries enrichies\n${data.failed_count} non trouvées`);
+            await loadLibraryData();
+        } else {
+            alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+        }
+    } catch (error) {
+        alert('❌ Erreur de connexion: ' + error.message);
+    } finally {
+        button.disabled = false;
+        button.textContent = '✨ Enrichir la bibliothèque';
     }
 }
 
@@ -145,7 +261,12 @@ async function viewSeries(seriesId) {
         if (data.nautiljon && data.nautiljon.url) {
             nautiljonHtml = `
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 20px;">
+                        ${data.nautiljon.cover_path ? `
+                            <div style="flex-shrink: 0;">
+                                <img src="/${data.nautiljon.cover_path}" alt="${data.title}" style="max-width: 120px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                            </div>
+                        ` : ''}
                         <div>
                             <h3 style="margin: 0 0 15px 0;">🌊 Informations Nautiljon</h3>
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; font-size: 0.95em;">
@@ -187,9 +308,14 @@ async function viewSeries(seriesId) {
                                 ` : ''}
                             </div>
                         </div>
-                        <a href="${data.nautiljon.url}" target="_blank" class="btn" style="background: white; color: #667eea; white-space: nowrap; margin-left: 15px;">
-                            ↗️ Nautiljon
-                        </a>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <a href="${data.nautiljon.url}" target="_blank" class="btn" style="background: white; color: #667eea; white-space: nowrap;">
+                                ↗️ Nautiljon
+                            </a>
+                            <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
+                                🔍 Chercher un autre titre
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -200,6 +326,9 @@ async function viewSeries(seriesId) {
                         ⚠️ Pas d'informations Nautiljon
                         <button class="btn" onclick="enrichSeriesFromModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')">
                             ✨ Enrichir
+                        </button>
+                        <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: #f59e0b;">
+                            🔍 Chercher manuellement
                         </button>
                     </p>
                 </div>
@@ -333,6 +462,12 @@ async function enrichSeriesFromModal(seriesId, seriesTitle) {
         btn.disabled = false;
         console.error('Erreur enrichissement:', error);
     }
+}
+
+// Fonction pour rechercher manuellement une série sur Nautiljon
+async function searchNautiljonManually(seriesId) {
+    // Naviguer vers la page Nautiljon avec la bibliothèque et la série pré-sélectionnées
+    window.location.href = `/nautiljon?libraryId=${libraryId}&seriesId=${seriesId}`;
 }
 
 async function searchMissingVolume(seriesTitle, volumeNumber) {

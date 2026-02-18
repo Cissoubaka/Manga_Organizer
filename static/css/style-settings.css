@@ -471,6 +471,66 @@
     min-width: 150px;
 }
 
+/* Styles pour la configuration des badges */
+.badge-config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.badge-config-item {
+    background: #f9fafb;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.badge-label {
+    margin-bottom: 15px;
+}
+
+.badge-label strong {
+    font-size: 1.1em;
+    color: #111;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.badge-label small {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.color-picker-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.color-picker-group input[type="color"] {
+    width: 60px;
+    height: 50px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.color-picker-group input[type="color"]:hover {
+    border-color: #667eea;
+}
+
+.color-text {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 0.9em;
+    background: white;
+    color: #667eea;
+}
+
 @media (max-width: 600px) {
     .form-actions {
         flex-direction: column;
@@ -479,4 +539,6 @@
     .form-actions .btn {
         width: 100%;
     }
-}
+    
+    .badge-config-grid {
+        grid-template-columns: 1fr;

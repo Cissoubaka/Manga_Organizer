@@ -15,16 +15,21 @@
                     <h1 id="library-title">📚 Bibliothèque</h1>
                     <p class="subtitle" id="library-path">Chargement...</p>
                 </div>
-                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
+                </div>
             </div>
         </header>
 
         <div class="content">
             <div class="controls">
                 <button class="btn" onclick="scanLibrary()">🔄 Scanner la bibliothèque</button>
+                <button class="btn" onclick="enrichAllSeries()" style="background: #10b981;">✨ Enrichir la bibliothèque</button>
                 <button class="btn" onclick="loadLibraryData()">📖 Recharger les données</button>
                 <button class="btn" onclick="window.location.href='/search'" style="background: #f59e0b;">🔍 Recherche</button>
                 <button class="btn" onclick="window.location.href='/import'" style="background: #f59e0b;">📥 Import de mangas</button>
+                <button class="btn" id="filter-status-btn" onclick="toggleStatusFilter()">📚 Toutes les séries</button>
                 <button class="btn" id="filter-btn" onclick="toggleMissingFilter()">⚠️ Volumes manquants uniquement</button>
             </div>
 

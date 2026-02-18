@@ -42,6 +42,12 @@ def import_page():
     return render_template('import.html')
 
 
+@library_bp.route('/transfer')
+def transfer_page():
+    """Page de transfert de séries entre bibliothèques"""
+    return render_template('transfer.html')
+
+
 # ========== API ==========
 
 @library_bp.route('/api/libraries', methods=['GET', 'POST'])
@@ -171,20 +177,9 @@ def library_operations(library_id):
 
 @library_bp.route('/api/scan/<int:library_id>', methods=['GET', 'POST'])
 def scan_library(library_id):
-    """Scanne une bibliothèque
-    
-    GET/POST params:
-    - auto_enrich (optional, bool): Enrichir les séries avec Nautiljon
-    """
+    """Scanne une bibliothèque (détecte séries et volumes, sans enrichissement)"""
     
     try:
-        # Support GET et POST
-        if request.method == 'POST':
-            data = request.get_json() or {}
-            auto_enrich = data.get('auto_enrich', False)
-        else:
-            auto_enrich = request.args.get('auto_enrich', 'false').lower() == 'true'
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -211,9 +206,9 @@ def scan_library(library_id):
                 'error': f'Le chemin n\'est pas un répertoire: {library_path}'
             }), 400
         
-        # Scanner avec enrichissement optionnel
+        # Scanner sans enrichissement (voir bouton d'enrichissement séparé)
         scanner = LibraryScanner()
-        series_count = scanner.scan_directory(library_id, library_path, auto_enrich=auto_enrich)
+        series_count = scanner.scan_directory(library_id, library_path, auto_enrich=False)
         
         return jsonify({'success': True, 'series_count': series_count})
     
@@ -223,6 +218,76 @@ def scan_library(library_id):
         return jsonify({
             'success': False, 
             'error': f'Erreur lors du scan: {error_msg}'
+        }), 500
+
+
+@library_bp.route('/api/library/<int:library_id>/enrich', methods=['POST'])
+def enrich_library(library_id):
+    """Enrichit toutes les séries sans infos Nautiljon d'une bibliothèque"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Récupérer toutes les séries sans infos Nautiljon
+        cursor.execute('''
+            SELECT id, title FROM series
+            WHERE library_id = ? AND nautiljon_url IS NULL
+            ORDER BY title
+        ''', (library_id,))
+        
+        series_list = cursor.fetchall()
+        conn.close()
+        
+        if not series_list:
+            return jsonify({
+                'success': True,
+                'message': 'Aucune série à enrichir',
+                'enriched_count': 0
+            })
+        
+        # Importer le scraper Nautiljon
+        from blueprints.nautiljon.scraper import NautiljonScraper, NautiljonDatabase
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        scraper = NautiljonScraper()
+        db_manager = NautiljonDatabase(current_app.config['DATABASE'])
+        
+        enriched_count = 0
+        failed_count = 0
+        
+        for series_id, series_title in series_list:
+            try:
+                # Chercher les infos Nautiljon
+                info = scraper.search_and_get_best_match(series_title)
+                
+                if info:
+                    # Sauvegarder les infos
+                    db_manager.update_series_nautiljon_info(series_id, info)
+                    enriched_count += 1
+                    print(f"✓ Enrichi: {series_title}")
+                else:
+                    failed_count += 1
+                    print(f"⚠️ Pas trouvé: {series_title}")
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Erreur enrichissement {series_title}: {e}")
+                print(f"❌ Erreur: {series_title} - {e}")
+        
+        return jsonify({
+            'success': True,
+            'enriched_count': enriched_count,
+            'failed_count': failed_count,
+            'total': len(series_list),
+            'message': f'Enrichissement terminé: {enriched_count} séries enrichies, {failed_count} non trouvées'
+        })
+    
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Erreur enrichissement bibliothèque {library_id}: {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': f'Erreur lors de l\'enrichissement: {error_msg}'
         }), 500
 
 
@@ -253,9 +318,10 @@ def get_library_series(library_id):
         conn = sqlite3.connect(current_app.config['DATABASE'])
         cursor = conn.cursor()
 
-        # Récupérer toutes les séries de la bibliothèque
+        # Récupérer toutes les séries avec les données Nautiljon
         cursor.execute('''
-            SELECT id, title, path, total_volumes, missing_volumes, has_parts, last_scanned
+            SELECT id, title, path, total_volumes, missing_volumes, has_parts, last_scanned,
+                   nautiljon_status, nautiljon_total_volumes, nautiljon_url, nautiljon_cover_path
             FROM series
             WHERE library_id = ?
             ORDER BY title
@@ -272,7 +338,11 @@ def get_library_series(library_id):
                 'total_volumes': row[3],
                 'missing_volumes': missing_volumes,
                 'has_parts': bool(row[5]),
-                'last_scanned': row[6]
+                'last_scanned': row[6],
+                'nautiljon_status': row[7],
+                'nautiljon_total_volumes': row[8],
+                'nautiljon_url': row[9],
+                'nautiljon_cover_path': row[10]
             })
 
         conn.close()
@@ -291,7 +361,7 @@ def get_series_details(series_id):
         cursor.execute('''
             SELECT s.id, s.title, s.path, s.total_volumes, s.missing_volumes, s.has_parts,
                    l.id, l.name,
-                   s.nautiljon_url, s.nautiljon_total_volumes, s.nautiljon_french_volumes,
+                   s.nautiljon_url, s.nautiljon_cover_path, s.nautiljon_total_volumes, s.nautiljon_french_volumes,
                    s.nautiljon_editor, s.nautiljon_status, s.nautiljon_mangaka,
                    s.nautiljon_year_start, s.nautiljon_year_end, s.nautiljon_updated_at
             FROM series s
@@ -347,14 +417,15 @@ def get_series_details(series_id):
             },
             'nautiljon': {
                 'url': series_row[8],
-                'total_volumes': series_row[9],
-                'french_volumes': series_row[10],
-                'editor': series_row[11],
-                'status': series_row[12],
-                'mangaka': series_row[13],
-                'year_start': series_row[14],
-                'year_end': series_row[15],
-                'updated_at': series_row[16]
+                'cover_path': series_row[9],
+                'total_volumes': series_row[10],
+                'french_volumes': series_row[11],
+                'editor': series_row[12],
+                'status': series_row[13],
+                'mangaka': series_row[14],
+                'year_start': series_row[15],
+                'year_end': series_row[16],
+                'updated_at': series_row[17]
             },
             'volumes': volumes
         })
@@ -727,6 +798,109 @@ def execute_import():
             'cleaned_directories': cleaned_dirs
         })
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ========== ROUTES DE TRANSFERT DE SÉRIES ==========
+
+@library_bp.route('/api/transfer/series/<int:library_id>', methods=['GET'])
+def get_transfer_series(library_id):
+    """Récupère les séries d'une bibliothèque pour le transfert"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id, name FROM libraries WHERE id = ?', (library_id,))
+    library = cursor.fetchone()
+    
+    if not library:
+        conn.close()
+        return jsonify({'error': 'Bibliothèque non trouvée'}), 404
+    
+    cursor.execute('''
+        SELECT 
+            id, 
+            title, 
+            total_volumes,
+            missing_volumes
+        FROM series 
+        WHERE library_id = ?
+        ORDER BY title
+    ''', (library_id,))
+    
+    series_list = []
+    for row in cursor.fetchall():
+        series_list.append({
+            'id': row['id'],
+            'title': row['title'],
+            'total_volumes': row['total_volumes'],
+            'missing_volumes': row['missing_volumes']
+        })
+    
+    conn.close()
+    
+    return jsonify({
+        'library_id': library_id,
+        'library_name': library['name'],
+        'series': series_list
+    })
+
+
+@library_bp.route('/api/transfer/move', methods=['POST'])
+def move_series():
+    """Transfère une série d'une bibliothèque à une autre"""
+    data = request.get_json()
+    
+    series_id = data.get('series_id')
+    from_library_id = data.get('from_library_id')
+    to_library_id = data.get('to_library_id')
+    
+    if not all([series_id, from_library_id, to_library_id]):
+        return jsonify({'error': 'Paramètres manquants'}), 400
+    
+    if from_library_id == to_library_id:
+        return jsonify({'error': 'Les bibliothèques doivent être différentes'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Vérifier que la série appartient bien à la bibliothèque source
+        cursor.execute('SELECT library_id FROM series WHERE id = ?', (series_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return jsonify({'error': 'Série non trouvée'}), 404
+        
+        if result['library_id'] != from_library_id:
+            conn.close()
+            return jsonify({'error': 'La série n\'appartient pas à cette bibliothèque'}), 400
+        
+        # Vérifier que les deux bibliothèques existent
+        cursor.execute('SELECT id FROM libraries WHERE id IN (?, ?)', (from_library_id, to_library_id))
+        libraries = cursor.fetchall()
+        
+        if len(libraries) != 2:
+            conn.close()
+            return jsonify({'error': 'Une ou plusieurs bibliothèques n\'existent pas'}), 404
+        
+        # Effectuer le transfert
+        cursor.execute(
+            'UPDATE series SET library_id = ? WHERE id = ?',
+            (to_library_id, series_id)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Série transférée vers la bibliothèque {to_library_id}'
+        })
+    
     except Exception as e:
         import traceback
         traceback.print_exc()

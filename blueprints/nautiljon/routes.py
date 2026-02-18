@@ -85,6 +85,77 @@ def get_nautiljon_info():
         }), 500
 
 
+@nautiljon_bp.route('/search-results/<int:series_id>', methods=['GET'])
+def get_search_results_for_series(series_id):
+    """
+    Cherche tous les résultats pour une série et montre les infos de chaque
+    Query params: ?title=override_title (optional pour chercher autre chose)
+    """
+    query_title = request.args.get('title', '').strip()
+    
+    try:
+        # Récupère la série
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT title FROM series WHERE id = ?', (series_id,))
+        series = cursor.fetchone()
+        conn.close()
+        
+        if not series:
+            return jsonify({'error': 'Série non trouvée'}), 404
+        
+        # Utilise le titre fourni ou le titre de la série
+        search_title = query_title or series['title']
+        
+        # Recherche les résultats
+        scraper = NautiljonScraper()
+        search_results = scraper.search_manga(search_title)
+        
+        if not search_results:
+            return jsonify({
+                'success': True,
+                'series_id': series_id,
+                'series_title': series['title'],
+                'search_query': search_title,
+                'results': []
+            })
+        
+        # Pour chaque résultat, récupère une prévisualisation
+        results_with_info = []
+        for idx, result in enumerate(search_results[:10]):  # Limiter à 10 pour ne pas faire trop de requêtes
+            try:
+                info = scraper.get_manga_info(result['url'])
+                if info:
+                    result['preview'] = {
+                        'total_volumes': info.get('total_volumes'),
+                        'french_volumes': info.get('french_volumes'),
+                        'editor': info.get('editor'),
+                        'mangaka': info.get('mangaka'),
+                        'status': info.get('status'),
+                        'year_start': info.get('year_start'),
+                        'year_end': info.get('year_end')
+                    }
+                results_with_info.append(result)
+            except Exception as e:
+                logger.warning(f"Erreur récupération infos pour {result['url']}: {e}")
+                results_with_info.append(result)
+        
+        return jsonify({
+            'success': True,
+            'series_id': series_id,
+            'series_title': series['title'],
+            'search_query': search_title,
+            'results': results_with_info
+        })
+    
+    except Exception as e:
+        logger.error(f"Erreur lors de la recherche: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @nautiljon_bp.route('/enrich/<int:series_id>', methods=['POST'])
 def enrich_series(series_id):
     """
@@ -119,6 +190,8 @@ def enrich_series(series_id):
         if not series:
             return jsonify({'error': 'Série non trouvée'}), 404
         
+        logger.info(f"Enrichissement de la série #{series_id} ({series['title']}) avec {search_by}={value}")
+        
         # Récupère les infos Nautiljon
         scraper = NautiljonScraper()
         
@@ -128,23 +201,70 @@ def enrich_series(series_id):
             info = scraper.search_and_get_best_match(value)
         
         if not info:
+            logger.warning(f"Aucune info trouvée pour la série #{series_id}")
             return jsonify({
                 'success': False,
                 'error': 'Impossible de trouver le manga sur Nautiljon'
             }), 404
         
+        logger.info(f"Infos trouvées: {info.get('title')} - {info.get('total_volumes')} volumes")
+        
         # Sauvegarde les infos
         db_manager = NautiljonDatabase(current_app.config['DATABASE'])
-        db_manager.update_series_nautiljon_info(series_id, info)
+        save_result = db_manager.update_series_nautiljon_info(series_id, info)
+        
+        if not save_result:
+            logger.error(f"Erreur sauvegarde pour la série #{series_id}")
+            return jsonify({
+                'success': False,
+                'error': f'Impossible de sauvegarder les infos pour la série #{series_id}'
+            }), 500
+        
+        logger.info(f"✓ Série #{series_id} enrichie avec succès")
+        
+        # Récupère les données mises à jour depuis la base
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT 
+                    id, nautiljon_url, nautiljon_cover_path,
+                    nautiljon_total_volumes, nautiljon_french_volumes,
+                    nautiljon_editor, nautiljon_status, nautiljon_mangaka,
+                    nautiljon_year_start, nautiljon_year_end, nautiljon_updated_at
+                FROM series WHERE id = ?
+            ''', (series_id,))
+            updated_series = cursor.fetchone()
+            conn.close()
+            
+            updated_nautiljon_data = None
+            if updated_series:
+                updated_nautiljon_data = {
+                    'url': updated_series['nautiljon_url'],
+                    'cover_path': updated_series['nautiljon_cover_path'],
+                    'total_volumes': updated_series['nautiljon_total_volumes'],
+                    'french_volumes': updated_series['nautiljon_french_volumes'],
+                    'editor': updated_series['nautiljon_editor'],
+                    'status': updated_series['nautiljon_status'],
+                    'mangaka': updated_series['nautiljon_mangaka'],
+                    'year_start': updated_series['nautiljon_year_start'],
+                    'year_end': updated_series['nautiljon_year_end'],
+                    'updated_at': updated_series['nautiljon_updated_at']
+                }
+                logger.info(f"Données mises à jour vérifiées pour série #{series_id}: {updated_nautiljon_data['url']}")
+        except Exception as e:
+            logger.warning(f"Impossible de vérifier les données mises à jour: {e}")
+            updated_nautiljon_data = info
         
         return jsonify({
             'success': True,
             'info': info,
+            'nautiljon_data': updated_nautiljon_data,
             'message': f"Infos récupérées pour: {info.get('title', series['title'])}"
         })
     
     except Exception as e:
-        logger.error(f"Erreur lors de l'enrichissement: {e}")
+        logger.error(f"Erreur lors de l'enrichissement: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -267,6 +387,58 @@ def batch_enrich_series():
     
     except Exception as e:
         logger.error(f"Erreur batch enrich: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@nautiljon_bp.route('/diagnostic', methods=['GET'])
+def diagnostic():
+    """Route de diagnostic pour vérifier l'état de la base de données"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Vérifier le schéma de la table series
+        cursor.execute("PRAGMA table_info(series)")
+        columns = cursor.fetchall()
+        
+        nautiljon_columns = {col[1]: col[2] for col in columns if col[1].startswith('nautiljon_')}
+        
+        # Vérifier une série avec les infos Nautiljon
+        cursor.execute('''
+            SELECT id, title, nautiljon_url, nautiljon_total_volumes 
+            FROM series 
+            WHERE nautiljon_url IS NOT NULL 
+            LIMIT 1
+        ''')
+        sample_series = cursor.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'nautiljon_columns': nautiljon_columns,
+            'columns_count': len(nautiljon_columns),
+            'expected_columns': [
+                'nautiljon_url',
+                'nautiljon_cover_path',
+                'nautiljon_total_volumes',
+                'nautiljon_french_volumes',
+                'nautiljon_editor',
+                'nautiljon_status',
+                'nautiljon_mangaka',
+                'nautiljon_year_start',
+                'nautiljon_year_end',
+                'nautiljon_updated_at'
+            ],
+            'sample_data': dict(sample_series) if sample_series else None,
+            'status': 'OK' if len(nautiljon_columns) >= 10 else 'MISSING_COLUMNS'
+        })
+    
+    except Exception as e:
+        logger.error(f"Diagnostic error: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)

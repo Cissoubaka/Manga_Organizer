@@ -95,6 +95,7 @@ class LibraryScanner:
         
         nautiljon_columns = [
             ('nautiljon_url', 'TEXT'),
+            ('nautiljon_cover_path', 'TEXT'),
             ('nautiljon_total_volumes', 'INTEGER'),
             ('nautiljon_french_volumes', 'INTEGER'),
             ('nautiljon_editor', 'TEXT'),
@@ -292,7 +293,7 @@ class LibraryScanner:
         Args:
             library_id: ID de la bibliothèque
             library_path: Chemin du répertoire à scanner
-            auto_enrich: Si True, enrichit les séries détectées avec les infos Nautiljon
+            auto_enrich: Obsolète (toujours False). L'enrichissement se fait via un bouton séparé
         """
         print(f"\n📂 Scan du répertoire: {library_path}")
 
@@ -542,14 +543,18 @@ class LibraryScanner:
 
         conn.commit()
         
-        # Enrichissement automatique Nautiljon si demandé
-        if auto_enrich:
-            print("\n🔍 Enrichissement Nautiljon en cours...")
-            cursor.execute('SELECT id, title FROM series WHERE library_id = ?', (library_id,))
-            series_list = cursor.fetchall()
-            
-            for series_id, series_title in series_list:
-                self.enrich_series_with_nautiljon(series_id, series_title, conn)
+        # ⚠️ Enrichissement Nautiljon DÉSACTIVÉ temporairement (IP bannie)
+        # Le code reste commenté pour être réactivé facilement plus tard
+        # if auto_enrich:
+        #     print("\n🔍 Enrichissement Nautiljon en cours...")
+        #     cursor.execute('SELECT id, title FROM series WHERE library_id = ?', (library_id,))
+        #     series_list = cursor.fetchall()
+        #     
+        #     for series_id, series_title in series_list:
+        #         self.enrich_series_with_nautiljon(series_id, series_title, conn)
+        #     
+        #     # IMPORTANT: Committer les modifications Nautiljon
+        #     conn.commit()
         
         conn.close()
 

@@ -15,7 +15,10 @@
                     <h1>⚙️ Configuration</h1>
                     <p class="subtitle">Paramètres de l'application</p>
                 </div>
-                <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                </div>
             </div>
         </header>
 
@@ -30,6 +33,9 @@
                 </button>
                 <button class="tab-button" onclick="switchTab('prowlarr')">
                     🔍 Prowlarr
+                </button>
+                <button class="tab-button" onclick="switchTab('badges')">
+                    🎨 Badges
                 </button>
                 <button class="tab-button" onclick="switchTab('general')" style="opacity: 0.5; cursor: not-allowed;" disabled>
                     🔧 Général (bientôt)
@@ -380,6 +386,79 @@
                                     </ul>
                                 </div>
                             </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Onglet Badges -->
+                <div class="tab-content" id="tab-badges">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>🎨 Configuration des Badges</h2>
+                            <p class="section-description">
+                                Personnalisez les couleurs des badges d'état des séries
+                            </p>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="badge-config-grid">
+                                <!-- Badge Finie (Vert) -->
+                                <div class="badge-config-item">
+                                    <div class="badge-label">
+                                        <strong>✅ Finie</strong>
+                                        <small>Série complete (volumes locaux = Nautiljon)</small>
+                                    </div>
+                                    <div class="color-picker-group">
+                                        <input type="color" id="badgeColorComplete" value="#10b981">
+                                        <input type="text" id="badgeColorCompleteText" class="color-text" readonly>
+                                    </div>
+                                </div>
+
+                                <!-- Badge En Cours (Rouge) -->
+                                <div class="badge-config-item">
+                                    <div class="badge-label">
+                                        <strong>🔄 En cours</strong>
+                                        <small>Volumes ne correspondent pas</small>
+                                    </div>
+                                    <div class="color-picker-group">
+                                        <input type="color" id="badgeColorOngoing" value="#ef4444">
+                                        <input type="text" id="badgeColorOngoingText" class="color-text" readonly>
+                                    </div>
+                                </div>
+
+                                <!-- Badge Incomplet (Orange) -->
+                                <div class="badge-config-item">
+                                    <div class="badge-label">
+                                        <strong>⚠️ Incomplet</strong>
+                                        <small>Volumes manquants, série pas terminée</small>
+                                    </div>
+                                    <div class="color-picker-group">
+                                        <input type="color" id="badgeColorIncomplete" value="#f59e0b">
+                                        <input type="text" id="badgeColorIncompleteText" class="color-text" readonly>
+                                    </div>
+                                </div>
+
+                                <!-- Badge Manquant (Bleu) -->
+                                <div class="badge-config-item">
+                                    <div class="badge-label">
+                                        <strong>📚 Manquant</strong>
+                                        <small>Série terminée, volumes manquants</small>
+                                    </div>
+                                    <div class="color-picker-group">
+                                        <input type="color" id="badgeColorMissing" value="#3b82f6">
+                                        <input type="text" id="badgeColorMissingText" class="color-text" readonly>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 20px;">
+                                <button class="btn" onclick="saveBadgeColors()" style="background: #10b981;">
+                                    💾 Sauvegarder les couleurs
+                                </button>
+                                <button class="btn" onclick="resetBadgeColors()" style="background: #6b7280; margin-left: 10px;">
+                                    🔄 Réinitialiser aux défauts
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

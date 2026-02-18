@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfert de Séries</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-transfer.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>↔️ Transfert de Séries</h1>
+                    <p class="subtitle">Déplacez les séries entre bibliothèques</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="transfer-panel">
+                <!-- PANEL GAUCHE -->
+                <div class="library-panel left-panel">
+                    <div class="panel-header">
+                        <h2>Bibliothèque Source</h2>
+                        <select id="left-library-select" class="library-select" onchange="loadLeftLibrary()">
+                            <option value="">-- Sélectionner une bibliothèque --</option>
+                        </select>
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" onclick="toggleLeftFilter('all')" data-filter="all">
+                                📚 Toutes les séries
+                            </button>
+                            <button class="filter-btn" onclick="toggleLeftFilter('complete')" data-filter="complete">
+                                ✅ Terminées
+                            </button>
+                            <button class="filter-btn" onclick="toggleLeftFilter('incomplete')" data-filter="incomplete">
+                                ⚠️ En cours
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="left-series-container" class="series-container">
+                        <p class="placeholder">Sélectionnez une bibliothèque source</p>
+                    </div>
+                </div>
+
+                <!-- BUTTON PANEL - CENTER -->
+                <div class="button-panel">
+                    <button id="move-right-btn" class="btn-move" onclick="moveSelectedRight()" title="Déplacer vers la droite">
+                        →
+                    </button>
+                    <button id="move-left-btn" class="btn-move" onclick="moveSelectedLeft()" title="Déplacer vers la gauche">
+                        ←
+                    </button>
+                </div>
+
+                <!-- PANEL DROITE -->
+                <div class="library-panel right-panel">
+                    <div class="panel-header">
+                        <h2>Bibliothèque Destination</h2>
+                        <select id="right-library-select" class="library-select" onchange="loadRightLibrary()">
+                            <option value="">-- Sélectionner une bibliothèque destination --</option>
+                        </select>
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" onclick="toggleRightFilter('all')" data-filter="all">
+                                📚 Toutes les séries
+                            </button>
+                            <button class="filter-btn" onclick="toggleRightFilter('complete')" data-filter="complete">
+                                ✅ Terminées
+                            </button>
+                            <button class="filter-btn" onclick="toggleRightFilter('incomplete')" data-filter="incomplete">
+                                ⚠️ En cours
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="right-series-container" class="series-container">
+                        <p class="placeholder">Sélectionnez une bibliothèque destination</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATS -->
+            <div class="transfer-stats">
+                <div class="stat">
+                    <label>Séries sélectionnées (gauche):</label>
+                    <span id="left-selected-count">0</span>
+                </div>
+                <div class="stat">
+                    <label>Séries sélectionnées (droite):</label>
+                    <span id="right-selected-count">0</span>
+                </div>
+                <div class="stat">
+                    <label>Transferts réussis:</label>
+                    <span id="transfer-success-count">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/transfer.js') }}"></script>
+</body>
+</html>

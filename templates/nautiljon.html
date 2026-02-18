@@ -158,8 +158,13 @@
 <body>
     <div class="container">
         <div class="nautiljon-header">
-            <h1>🌊 Enrichissement Nautiljon</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Enrichissez vos séries avec les infos de Nautiljon.com</p>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h1>🌊 Enrichissement Nautiljon</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Enrichissez vos séries avec les infos de Nautiljon.com</p>
+                </div>
+                <a href="/" class="btn" style="background: #6c757d; white-space: nowrap;">← Retour à l'accueil</a>
+            </div>
         </div>
 
         <div class="tabs">
@@ -173,28 +178,40 @@
         <div id="single" class="tab-content active">
             <div class="search-and-enrich">
                 <div class="search-form">
-                    <h2>Rechercher un Manga</h2>
+                    <h2>📚 Sélectionner une Série</h2>
                     <div class="form-group">
-                        <label for="search-title">Titre du manga:</label>
-                        <input type="text" id="search-title" placeholder="Ex: One Piece" value="One Piece">
+                        <label for="library-select-single">Bibliothèque:</label>
+                        <select id="library-select-single" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 15px;" onchange="onLibrarySelectChange()">
+                            <option value="">--- Chargement des bibliothèques ---</option>
+                        </select>
                     </div>
-                    <button class="btn btn-primary" onclick="searchManga()" style="width: 100%;">
-                        🔍 Rechercher sur Nautiljon
+                    <div class="form-group">
+                        <label for="series-select">Série à enrichir:</label>
+                        <select id="series-select" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                            <option value="">Sélectionnez d'abord une bibliothèque</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="searchSeriesOnNautiljon()" style="width: 100%; margin-bottom: 15px;">
+                        🔍 Chercher avec le titre de la série
                     </button>
-                    <div id="search-results" class="results-container" style="display: none;"></div>
+
+                    <hr style="margin: 15px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+                    <h3 style="font-size: 0.95em; color: #666; margin-bottom: 10px;">Ou chercher avec un titre différent:</h3>
+                    <div class="form-group">
+                        <label for="custom-search-title">Titre personnalisé:</label>
+                        <input type="text" id="custom-search-title" placeholder="Ex: GANGSTA, One Piece..." style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    </div>
+                    <button class="btn" onclick="searchWithCustomTitle()" style="width: 100%;">
+                        ✏️ Rechercher
+                    </button>
+                    
+                    <div id="search-results" class="results-container" style="display: none; margin-top: 15px;"></div>
                 </div>
 
                 <div class="enrich-panel">
-                    <h2>Ou Enrichir Directement</h2>
-                    <div class="form-group">
-                        <label for="series-select">Sélectionner une série:</label>
-                        <select id="series-select" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
-                            <option value="">Chargement...</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-success" onclick="enrichSelectedSeries()" style="width: 100%;">
-                        ✨ Enrichir cette Série
-                    </button>
+                    <h2>📋 Résultats & Infos</h2>
                     <div id="enrich-result" style="margin-top: 15px;"></div>
                 </div>
             </div>
@@ -202,6 +219,13 @@
 
         <!-- Tab 2: Enrichissement par lot -->
         <div id="batch" class="tab-content">
+            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <label for="library-select-batch">Sélectionner une bibliothèque:</label>
+                <select id="library-select-batch" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 15px;" onchange="onBatchLibrarySelectChange()">
+                    <option value="">--- Chargement des bibliothèques ---</option>
+                </select>
+            </div>
+            
             <div class="action-bar">
                 <button class="btn" onclick="selectAllSeries()">✅ Tout sélectionner</button>
                 <button class="btn" onclick="deselectAllSeries()">❌ Tout désélectionner</button>
@@ -278,6 +302,11 @@
     <script>
         let allSeries = [];
         let selectedSeriesIds = new Set();
+        
+        // Récupérer les paramètres URL pour pré-sélectionner la bibliothèque et la série
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialLibraryId = urlParams.get('libraryId');
+        const initialSeriesId = urlParams.get('seriesId');
 
         function switchTab(tabName) {
             // Cache tous les tabs
@@ -294,41 +323,105 @@
 
             // Charge les données au besoin
             if (tabName === 'batch') {
-                loadAllSeries();
+                loadLibrariesForBatch();
             } else if (tabName === 'library') {
-                loadLibraries();
+                loadLibrariesForLibrary();
             } else if (tabName === 'single') {
-                loadSeriesSelect();
+                loadLibrariesForSingle();
+            }
+        }
+        
+        async function loadLibrariesForSingle() {
+            try {
+                const response = await fetch('/api/libraries');
+                const libraries = await response.json();
+                const select = document.getElementById('library-select-single');
+                select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                
+                // Si on vient d'une modal (libraryId dans les paramètres), pré-sélectionner
+                if (initialLibraryId) {
+                    select.value = initialLibraryId;
+                    // Charger les séries de cette bibliothèque
+                    await loadSeriesSelect();
+                    
+                    // Pré-sélectionner la série si elle est fournie
+                    if (initialSeriesId) {
+                        setTimeout(() => {
+                            const serieSelect = document.getElementById('series-select');
+                            serieSelect.value = initialSeriesId;
+                        }, 100);
+                    }
+                } else if (libraries.length > 0) {
+                    // Sinon, charger les séries de la première bibliothèque
+                    loadSeriesSelect();
+                }
+            } catch (error) {
+                console.error('Erreur chargement bibliothèques:', error);
+            }
+        }
+        
+        async function loadLibrariesForBatch() {
+            try {
+                const response = await fetch('/api/libraries');
+                const libraries = await response.json();
+                const select = document.getElementById('library-select-batch');
+                select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            } catch (error) {
+                console.error('Erreur chargement bibliothèques:', error);
+            }
+        }
+        
+        async function loadLibrariesForLibrary() {
+            try {
+                const response = await fetch('/api/libraries');
+                const libraries = await response.json();
+                const select = document.getElementById('library-select');
+                select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            } catch (error) {
+                console.error('Erreur chargement bibliothèques:', error);
             }
         }
 
-        async function searchManga() {
-            const title = document.getElementById('search-title').value.trim();
+        // Mode manual search toggle
+        let manualSearchVisible = false;
+
+        async function searchWithCustomTitle() {
+            const title = document.getElementById('custom-search-title').value.trim();
+            const seriesId = document.getElementById('series-select').value;
+            
             if (!title) {
                 alert('Veuillez entrer un titre');
+                return;
+            }
+
+            if (!seriesId) {
+                alert('Veuillez sélectionner une série');
                 return;
             }
 
             const resultsDiv = document.getElementById('search-results');
             resultsDiv.innerHTML = '<p>⏳ Recherche...</p>';
             resultsDiv.style.display = 'block';
+            document.getElementById('enrich-result').innerHTML = '';
 
             try {
                 const results = await NautiljonAPI.searchManga(title);
                 
                 if (!results.length) {
-                    resultsDiv.innerHTML = '<p>❌ Aucun résultat trouvé</p>';
+                    resultsDiv.innerHTML = '<p>❌ Aucun résultat trouvé pour "<strong>' + title + '</strong>"</p>';
                     return;
                 }
 
-                let html = '<h3>Résultats de recherche:</h3>';
+                let html = `<h3>Résultats pour "<strong>${title}</strong>" (${results.length} trouvés):</h3>`;
+                let resultNum = 1;
                 results.forEach(result => {
                     html += `
-                        <div class="result-item" onclick="selectSearchResult('${result.url}', '${result.title.replace(/'/g, "\\'")}')">
-                            <div class="result-title">${result.title}</div>
+                        <div class="result-item" onclick="selectSearchResultForEnrichment(${seriesId}, '${result.url.replace(/'/g, "\\'")}', '${result.title.replace(/'/g, "\\'")}')">
+                            <div class="result-title">${resultNum}. ${result.title}</div>
                             <div class="result-url">${result.url}</div>
                         </div>
                     `;
+                    resultNum++;
                 });
                 resultsDiv.innerHTML = html;
             } catch (error) {
@@ -336,31 +429,112 @@
             }
         }
 
-        async function selectSearchResult(url, title) {
-            const resultDiv = document.getElementById('enrich-result');
-            resultDiv.innerHTML = '<p>📖 Récupération des infos...</p>';
+        async function searchSeriesOnNautiljon() {
+            const seriesId = document.getElementById('series-select').value;
+            if (!seriesId) {
+                alert('Veuillez sélectionner une série');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('search-results');
+            resultsDiv.innerHTML = '<p>⏳ Recherche sur Nautiljon...</p>';
+            resultsDiv.style.display = 'block';
+            document.getElementById('enrich-result').innerHTML = '';
 
             try {
-                const result = await NautiljonAPI.enrichSeries(1, url, 'url');
+                const data = await NautiljonAPI.getSearchResultsForSeries(seriesId);
+                
+                if (!data.success || !data.results || data.results.length === 0) {
+                    resultsDiv.innerHTML = '<p>❌ Aucun résultat trouvé</p>';
+                    return;
+                }
+
+                let html = `<h3>Résultats pour "<strong>${data.series_title}</strong>" (${data.results.length} trouvés):</h3>`;
+                let resultNum = 1;
+                data.results.forEach(result => {
+                    const preview = result.preview || {};
+                    html += `
+                        <div class="result-item" onclick="selectSearchResultForEnrichment(${data.series_id}, '${result.url.replace(/'/g, "\\'")}', '${result.title.replace(/'/g, "\\'")}')">
+                            <div class="result-title">${resultNum}. ${result.title}</div>
+                            <div class="result-url">${result.url}</div>
+                            ${preview.total_volumes ? `<div style="font-size: 0.85em; color: #666; margin-top: 5px;">📊 ${preview.total_volumes} tomes${preview.french_volumes ? ` (${preview.french_volumes} VF)` : ''} ${preview.editor ? `- ${preview.editor}` : ''}</div>` : ''}
+                        </div>
+                    `;
+                    resultNum++;
+                });
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p>❌ Erreur: ${error.message}</p>`;
+            }
+        }
+
+        async function selectSearchResultForEnrichment(seriesId, url, title) {
+            const resultDiv = document.getElementById('enrich-result');
+            resultDiv.innerHTML = '<p>📖 Récupération et sauvegarde des infos... Veuillez patienter...</p>';
+            document.getElementById('search-results').style.display = 'none';
+
+            try {
+                const result = await NautiljonAPI.enrichSeries(seriesId, url, 'url');
                 
                 if (result.success) {
+                    // Recharger les données de la série pour vérifier la sauvegarde
+                    const seriesCheckResponse = await fetch(`/api/series/${seriesId}`);
+                    const seriesCheck = await seriesCheckResponse.json();
+                    
+                    const sailSuccessful = seriesCheck.nautiljon && seriesCheck.nautiljon.url === result.info.url;
+                    
                     resultDiv.innerHTML = `
-                        <div style="background: #d4edda; padding: 15px; border-radius: 6px; border: 1px solid #c3e6cb; color: #155724;">
-                            <h3>✅ ${title}</h3>
-                            <div class="nautiljon-card" style="background: transparent; color: inherit; border: none; padding: 0; margin: 0;">
-                                <div class="info-grid">
-                                    ${result.info.total_volumes ? `
-                                        <div class="info-item" style="background: transparent; color: inherit; border: none; padding: 0;">
-                                            <span class="label" style="color: #155724;">Volumes Totaux:</span>
-                                            <span class="value">${result.info.total_volumes}</span>
-                                        </div>
-                                    ` : ''}
+                        <div style="background: #d4edda; padding: 20px; border-radius: 6px; border: 1px solid #c3e6cb; color: #155724;">
+                            <div style="display: flex; gap: 20px; align-items: flex-start;">
+                                ${result.info.cover_path ? `
+                                    <img src="/${result.info.cover_path}" alt="${title}" style="max-width: 140px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); flex-shrink: 0;">
+                                ` : ''}
+                                <div>
+                                    <h3 style="margin: 0 0 15px 0;">✅ ${result.info.title}</h3>
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.95em; margin-bottom: 15px;">
+                                        ${result.info.total_volumes ? `
+                                            <div>
+                                                <strong>Volumes Totaux:</strong>
+                                                <div>${result.info.total_volumes}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${result.info.french_volumes ? `
+                                            <div>
+                                                <strong>Tomes Français:</strong>
+                                                <div>${result.info.french_volumes}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${result.info.editor ? `
+                                            <div style="grid-column: 1/-1;">
+                                                <strong>Éditeur:</strong>
+                                                <div>${result.info.editor}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${result.info.mangaka ? `
+                                            <div style="grid-column: 1/-1;">
+                                                <strong>Mangaka:</strong>
+                                                <div>${result.info.mangaka}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${result.info.status ? `
+                                            <div>
+                                                <strong>Statut:</strong>
+                                                <div>${result.info.status}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    <div style="background: #fff; padding: 12px; border-radius: 4px; border-left: 4px solid #28a745; font-size: 0.9em;">
+                                        ${sailSuccessful ? 
+                                            '✓ Les informations ont été sauvegardées avec succès dans la base de données.' :
+                                            '⚠️ Enregistrement effectué mais vérification de sauvegarde impossible. Rechargez la page pour confirmer.'
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     `;
                 } else {
-                    resultDiv.innerHTML = `<div class="enrichment-result error">❌ ${result.error}</div>`;
+                    resultDiv.innerHTML = `<div class="enrichment-result error">❌ Erreur: ${result.error}</div>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="enrichment-result error">❌ Erreur: ${error.message}</div>`;
@@ -368,55 +542,51 @@
         }
 
         async function loadSeriesSelect() {
-            try {
-                const response = await fetch('/api/library/1/series');
-                if (!response.ok) return;
-                
-                const series = await response.json();
-                const select = document.getElementById('series-select');
-                select.innerHTML = series.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
-            } catch (error) {
-                console.error('Erreur chargement séries:', error);
-            }
-        }
-
-        async function enrichSelectedSeries() {
-            const seriesId = document.getElementById('series-select').value;
-            if (!seriesId) {
-                alert('Veuillez sélectionner une série');
+            const libraryId = document.getElementById('library-select-single').value;
+            const select = document.getElementById('series-select');
+            
+            if (!libraryId) {
+                select.innerHTML = '<option value="">Sélectionnez une bibliothèque</option>';
                 return;
             }
-
-            const resultDiv = document.getElementById('enrich-result');
-            resultDiv.innerHTML = '<p>⏳ Enrichissement...</p>';
-
+            
+            select.innerHTML = '<option value="">Chargement...</option>';
+            
             try {
-                // Récupérer le titre de la série
-                const seriesResponse = await fetch(`/api/series/${seriesId}`);
-                const series = await seriesResponse.json();
-
-                const result = await NautiljonAPI.enrichSeries(seriesId, series.title, 'title');
+                const response = await fetch(`/api/library/${libraryId}/series`);
+                if (!response.ok) throw new Error('Erreur API');
                 
-                if (result.success) {
-                    resultDiv.innerHTML = `
-                        <div style="background: #d4edda; padding: 15px; border-radius: 6px; border: 1px solid #c3e6cb; color: #155724;">
-                            <h3>✅ ${result.info.title}</h3>
-                            ${result.info.total_volumes ? `<p>📖 <strong>${result.info.total_volumes}</strong> volumes</p>` : ''}
-                            ${result.info.editor ? `<p>📕 Éditeur: <strong>${result.info.editor}</strong></p>` : ''}
-                            ${result.info.status ? `<p>🔄 Statut: <strong>${result.info.status}</strong></p>` : ''}
-                        </div>
-                    `;
+                const series = await response.json();
+                if (series.length === 0) {
+                    select.innerHTML = '<option value="">Aucune série trouvée dans cette bibliothèque</option>';
                 } else {
-                    resultDiv.innerHTML = `<div class="enrichment-result error">❌ ${result.error}</div>`;
+                    select.innerHTML = series.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="enrichment-result error">❌ Erreur: ${error.message}</div>`;
+                console.error('Erreur chargement séries:', error);
+                select.innerHTML = '<option value="">Erreur lors du chargement</option>';
             }
+        }
+        
+        function onLibrarySelectChange() {
+            loadSeriesSelect();
+        }
+        
+        function onBatchLibrarySelectChange() {
+            selectedSeriesIds.clear();
+            loadAllSeries();
         }
 
         async function loadAllSeries() {
+            const libraryId = document.getElementById('library-select-batch').value;
+            
+            if (!libraryId) {
+                alert('Veuillez sélectionner une bibliothèque');
+                return;
+            }
+            
             try {
-                const response = await fetch('/api/library/1/series');
+                const response = await fetch(`/api/library/${libraryId}/series`);
                 if (!response.ok) return;
                 
                 allSeries = await response.json();
@@ -560,7 +730,20 @@
 
         // Init
         window.addEventListener('load', () => {
-            loadSeriesSelect();
+            // Si on vient d'une modal avec paramètres, activer l'onglet 'single'
+            if (initialLibraryId || initialSeriesId) {
+                // Activer l'onglet 'Enrichir une série'
+                document.querySelectorAll('.tab-content').forEach(el => {
+                    el.classList.remove('active');
+                });
+                document.querySelectorAll('.tab').forEach(el => {
+                    el.classList.remove('active');
+                });
+                document.getElementById('single').classList.add('active');
+                document.querySelector('[onclick="switchTab(\'single\')"]').classList.add('active');
+            }
+            
+            loadLibrariesForSingle();
         });
     </script>
 </body>

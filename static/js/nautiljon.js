@@ -213,6 +213,27 @@ const NautiljonAPI = {
         modal.querySelector('.modal-content').appendChild(closeBtn);
 
         return results;
+    },
+
+    /**
+     * Get search results for a series with preview info
+     * @param {number} seriesId - Series ID
+     * @param {string} overrideTitle - Optional title to search instead of series title
+     * @returns {Promise<Object>} Search results with preview data
+     */
+    async getSearchResultsForSeries(seriesId, overrideTitle = null) {
+        try {
+            let url = `/api/nautiljon/search-results/${seriesId}`;
+            if (overrideTitle) {
+                url += `?title=${encodeURIComponent(overrideTitle)}`;
+            }
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Search results error:', error);
+            return { success: false, error: error.message, results: [] };
+        }
     }
 };
 

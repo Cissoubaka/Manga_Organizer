@@ -543,24 +543,168 @@ async function saveProwlarrIndexers() {
 
 // ===== TABS =====
 function switchTab(tabName) {
+    // Supprimer les classes active de tous les boutons et contenus
     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    // Ajouter la classe active au bouton cliqué
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    } else {
+        // Fallback : chercher le bouton par son onclick
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            if (btn.getAttribute('onclick').includes(`'${tabName}'`)) {
+                btn.classList.add('active');
+            }
+        });
+    }
+    
+    // Afficher le contenu de l'onglet
+    const tabElement = document.getElementById('tab-' + tabName);
+    if (tabElement) {
+        tabElement.classList.add('active');
+    }
+    
+    // Charger les données spécifiques à chaque onglet
+    if (tabName === 'amule') {
+        loadSettings();
+    } else if (tabName === 'ebdz') {
+        loadEbdzConfig();
+    } else if (tabName === 'prowlarr') {
+        loadProwlarrSettings();
+    } else if (tabName === 'badges') {
+        initBadgeColorPickers();
+    }
+}
+
+// ===== BADGES =====
+function initBadgeColorPickers() {
+    // Charger les couleurs sauvegardées ou utiliser les défauts
+    const savedColors = JSON.parse(localStorage.getItem('badgeColors')) || {
+        complete: '#10b981',
+        ongoing: '#ef4444',
+        incomplete: '#f59e0b',
+        missing: '#3b82f6'
+    };
+    
+    // Appliquer les couleurs aux pickers
+    document.getElementById('badgeColorComplete').value = savedColors.complete;
+    document.getElementById('badgeColorOngoing').value = savedColors.ongoing;
+    document.getElementById('badgeColorIncomplete').value = savedColors.incomplete;
+    document.getElementById('badgeColorMissing').value = savedColors.missing;
+    
+    // Initialiser les textes
+    const badges = ['Complete', 'Ongoing', 'Incomplete', 'Missing'];
+    
+    badges.forEach(badge => {
+        const colorInput = document.getElementById(`badgeColor${badge}`);
+        const textInput = document.getElementById(`badgeColor${badge}Text`);
+        
+        if (colorInput && textInput) {
+            // Initialiser le texte avec la couleur
+            textInput.value = colorInput.value;
+            
+            // Mettre à jour le texte quand la couleur change
+            colorInput.addEventListener('input', () => {
+                textInput.value = colorInput.value;
+            });
+        }
+    });
+}
+
+function saveBadgeColors() {
+    const colors = {
+        complete: document.getElementById('badgeColorComplete')?.value || '#10b981',
+        ongoing: document.getElementById('badgeColorOngoing')?.value || '#ef4444',
+        incomplete: document.getElementById('badgeColorIncomplete')?.value || '#f59e0b',
+        missing: document.getElementById('badgeColorMissing')?.value || '#3b82f6'
+    };
+    
+    // Sauvegarder dans le localStorage
+    localStorage.setItem('badgeColors', JSON.stringify(colors));
+    
+    // Afficher un message de confirmation
+    try {
+        if (document.getElementById('settingsMessage')) {
+            showMessage('settingsMessage', '✅ Couleurs des badges sauvegardées !', 'success');
+        } else {
+            alert('✅ Couleurs des badges sauvegardées !');
+        }
+    } catch (e) {
+        alert('✅ Couleurs des badges sauvegardées !');
+    }
+    
+    // Rafraîchir la page pour appliquer les changements
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+function resetBadgeColors() {
+    if (!confirm('Êtes-vous sûr de vouloir réinitialiser les couleurs aux valeurs par défaut ?')) {
+        return;
+    }
+    
+    const defaultColors = {
+        complete: '#10b981',
+        ongoing: '#ef4444',
+        incomplete: '#f59e0b',
+        missing: '#3b82f6'
+    };
+    
+    document.getElementById('badgeColorComplete').value = defaultColors.complete;
+    document.getElementById('badgeColorOngoing').value = defaultColors.ongoing;
+    document.getElementById('badgeColorIncomplete').value = defaultColors.incomplete;
+    document.getElementById('badgeColorMissing').value = defaultColors.missing;
+    
+    // Mettre à jour les textes
+    document.getElementById('badgeColorCompleteText').value = defaultColors.complete;
+    document.getElementById('badgeColorOngoingText').value = defaultColors.ongoing;
+    document.getElementById('badgeColorIncompleteText').value = defaultColors.incomplete;
+    document.getElementById('badgeColorMissingText').value = defaultColors.missing;
+    
+    // Sauvegarder
+    saveBadgeColors();
 }
 
 // ===== MESSAGES =====
 function showMessage(elementId, text, type) {
-    const msg = document.getElementById(elementId);
-    msg.textContent = text;
-    msg.className = 'message ' + type;
-    msg.style.display = 'block';
-    setTimeout(() => { msg.style.display = 'none'; }, 6000);
+    try {
+        const msg = document.getElementById(elementId);
+        if (msg) {
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 6000);
+        }
+    } catch (error) {
+        console.error('Erreur showMessage:', error);
+    }
 }
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-    loadSettings();
-    loadEbdzConfig();
-    loadProwlarrSettings();
+    try {
+        loadSettings();
+    } catch (e) {
+        console.error('Erreur loadSettings:', e);
+    }
+    
+    try {
+        loadEbdzConfig();
+    } catch (e) {
+        console.error('Erreur loadEbdzConfig:', e);
+    }
+    
+    try {
+        loadProwlarrSettings();
+    } catch (e) {
+        console.error('Erreur loadProwlarrSettings:', e);
+    }
+    
+    try {
+        initBadgeColorPickers();
+    } catch (e) {
+        console.error('Erreur initBadgeColorPickers:', e);
+    }
 });

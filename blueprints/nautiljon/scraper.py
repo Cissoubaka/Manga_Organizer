@@ -5,9 +5,12 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import sqlite3
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin
 import time
 import logging
+import os
+from pathlib import Path
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,9 @@ class NautiljonScraper:
             
             response = self.session.get(search_url, params=params, timeout=10)
             response.encoding = 'utf-8'
+            
+            # Pause pour éviter un bannissement IP
+            time.sleep(5)
             
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
@@ -84,7 +90,7 @@ class NautiljonScraper:
             logger.error(f"Erreur lors de la recherche Nautiljon: {e}")
             return []
     
-    def get_manga_info(self, manga_url_or_title):
+    def get_manga_info(self, manga_url_or_title, covers_dir=None):
         """
         Récupère les infos détaillées d'un manga
         Accepte soit une URL complète, soit un titre (va chercher d'abord)
@@ -93,6 +99,8 @@ class NautiljonScraper:
         {
             'title': str,
             'url': str,
+            'cover_url': str,  # URL de la couverture sur Nautiljon
+            'cover_path': str,  # Chemin relatif du fichier local
             'total_volumes': int or None,
             'french_volumes': int or None,
             'editor': str,
@@ -102,6 +110,8 @@ class NautiljonScraper:
             'year_end': int or None
         }
         """
+        if covers_dir is None:
+            covers_dir = "./data/covers"
         try:
             # Si c'est un titre, chercher l'URL d'abord
             if not manga_url_or_title.startswith('http'):
@@ -123,6 +133,9 @@ class NautiljonScraper:
             response = self.session.get(manga_url, timeout=10)
             response.encoding = 'utf-8'
             
+            # Pause pour éviter un bannissement IP
+            time.sleep(5)
+            
             if response.status_code != 200:
                 logger.warning(f"Erreur HTTP: {response.status_code} pour {manga_url}")
                 return None
@@ -133,6 +146,8 @@ class NautiljonScraper:
             info = {
                 'title': None,
                 'url': manga_url,
+                'cover_url': None,
+                'cover_path': None,
                 'total_volumes': None,
                 'french_volumes': None,
                 'editor': None,
@@ -150,6 +165,32 @@ class NautiljonScraper:
                 if title_text.startswith('Modifier'):
                     title_text = title_text[8:].strip()
                 info['title'] = title_text
+            
+            # Récupère la couverture
+            cover_img = None
+            # Chercher l'image avec alt correspondant au titre
+            if info['title']:
+                cover_img = soup.find('img', alt=info['title'])
+            
+            # Fallback: chercher l'image qui ressemble à une couverture
+            if not cover_img:
+                # Chercher une image avec src contenant '/images/manga/'
+                cover_img = soup.find('img', src=lambda x: x and '/images/manga/' in x and 'mini' in x)
+            
+            if cover_img:
+                cover_src = cover_img.get('src')
+                if cover_src:
+                    cover_url = urljoin(self.base_url, cover_src)
+                    info['cover_url'] = cover_url
+                    
+                    # Télécharger et sauvegarder la couverture localement
+                    try:
+                        cover_path = self._download_cover(cover_url, covers_dir, info['title'])
+                        if cover_path:
+                            info['cover_path'] = cover_path
+                            logger.debug(f"Couverture téléchargée: {cover_path}")
+                    except Exception as e:
+                        logger.warning(f"Impossible de télécharger la couverture: {e}")
             
             # Extraction du texte pour les regex
             # Format: "Nb volumes VO : 113 (En cours)"
@@ -224,6 +265,43 @@ class NautiljonScraper:
             logger.error(f"Erreur lors de la récupération des infos: {e}")
             return None
     
+    def _download_cover(self, cover_url, covers_dir, manga_title):
+        """
+        Télécharge la couverture et la sauvegarde localement
+        
+        Returns:
+            str: Chemin relatif du fichier téléchargé, ou None en cas d'erreur
+        """
+        try:
+            # Créer le dossier s'il n'existe pas
+            Path(covers_dir).mkdir(parents=True, exist_ok=True)
+            
+            # Générer un nom de fichier unique basé sur le hash de l'URL
+            url_hash = hashlib.md5(cover_url.encode()).hexdigest()
+            # Garder aussi l'extension originale si possible
+            file_ext = '.webp'  # Nautiljon utilise tous des webp
+            filename = f"{url_hash}{file_ext}"
+            filepath = os.path.join(covers_dir, filename)
+            
+            # Si le fichier existe déjà, retourner juste le chemin
+            if os.path.exists(filepath):
+                return f"covers/{filename}"
+            
+            # Télécharger le fichier
+            response = self.session.get(cover_url, timeout=10)
+            if response.status_code == 200:
+                with open(filepath, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Couverture téléchargée: {filename}")
+                return f"covers/{filename}"
+            else:
+                logger.warning(f"Erreur téléchargement couverture: HTTP {response.status_code}")
+                return None
+        
+        except Exception as e:
+            logger.error(f"Erreur lors du téléchargement de la couverture: {e}")
+            return None
+    
     def search_and_get_best_match(self, title):
         """
         Cherche un manga et retourne les infos du meilleur résultat
@@ -247,6 +325,7 @@ class NautiljonDatabase:
     
     NAUTILJON_SCHEMA = """
         ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_url TEXT;
+        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_cover_path TEXT;
         ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_total_volumes INTEGER;
         ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_french_volumes INTEGER;
         ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_editor TEXT;
@@ -290,9 +369,16 @@ class NautiljonDatabase:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             cursor = conn.cursor()
             
+            # S'assurer que les colonnes existent
+            logger.info(f"Vérification et création des colonnes Nautiljon si necessaire...")
+            self.init_database()
+            
+            logger.info(f"Sauvegarde Nautiljon pour série #{series_id}: {nautiljon_info.get('title')}")
+            
             cursor.execute('''
                 UPDATE series SET
                     nautiljon_url = ?,
+                    nautiljon_cover_path = ?,
                     nautiljon_total_volumes = ?,
                     nautiljon_french_volumes = ?,
                     nautiljon_editor = ?,
@@ -304,6 +390,7 @@ class NautiljonDatabase:
                 WHERE id = ?
             ''', (
                 nautiljon_info.get('url'),
+                nautiljon_info.get('cover_path'),
                 nautiljon_info.get('total_volumes'),
                 nautiljon_info.get('french_volumes'),
                 nautiljon_info.get('editor'),
@@ -314,14 +401,33 @@ class NautiljonDatabase:
                 series_id
             ))
             
+            # Vérifier que la mise à jour a bien eu lieu
+            rows_affected = cursor.rowcount
+            logger.info(f"Lignes affectées: {rows_affected}")
+            
+            if rows_affected == 0:
+                logger.error(f"Aucune ligne affectée - série #{series_id} non trouvée ?")
+                conn.close()
+                return False
+            
             conn.commit()
+            
+            # Vérifier les données sauvegardées
+            cursor.execute('SELECT nautiljon_url, nautiljon_total_volumes FROM series WHERE id = ?', (series_id,))
+            check_row = cursor.fetchone()
+            
+            if check_row:
+                logger.info(f"Vérification sauvegarde - URL: {check_row[0]}, Volumes: {check_row[1]}")
+            else:
+                logger.error(f"Impossible de vérifier la sauvegarde pour série #{series_id}")
+            
             conn.close()
             
-            logger.info(f"Infos Nautiljon mises à jour pour série #{series_id}")
+            logger.info(f"✓ Infos Nautiljon mises à jour pour série #{series_id}")
             return True
         
         except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour: {e}")
+            logger.error(f"Erreur lors de la mise à jour Nautiljon: {e}", exc_info=True)
             return False
     
     def get_series_nautiljon_info(self, series_id):
@@ -334,6 +440,7 @@ class NautiljonDatabase:
             cursor.execute('''
                 SELECT 
                     nautiljon_url,
+                    nautiljon_cover_path,
                     nautiljon_total_volumes,
                     nautiljon_french_volumes,
                     nautiljon_editor,

@@ -316,3 +316,164 @@
 .series-container::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
 }
+/* Tag Filter Section */
+.tag-filter-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.tag-filter-section label {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.tag-filter {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.tag-filter:hover {
+    border-color: #3b82f6;
+}
+
+.tag-filter:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+/* Badge Filter Section */
+.badge-filter-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.badge-filter-section label {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.badge-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.badge-filter-btn {
+    padding: 6px 10px;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0.7;
+}
+
+.badge-filter-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.badge-filter-btn.active {
+    opacity: 1;
+    border-color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+
+/* Tags dans les series */
+.series-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    border: 1px solid #93c5fd;
+}
+
+.tag-badge.action-tag {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+.tag-badge.adventure-tag {
+    background: #fed7aa;
+    color: #92400e;
+    border-color: #fdba74;
+}
+
+.tag-badge.romance-tag {
+    background: #fbcfe8;
+    color: #9d174d;
+    border-color: #f472b6;
+}
+
+.tag-badge.comedy-tag {
+    background: #fef08a;
+    color: #854d0e;
+    border-color: #fde047;
+}
+
+.tag-badge.drama-tag {
+    background: #c7d2fe;
+    color: #312e81;
+    border-color: #a5b4fc;
+}
+
+.tag-badge.thriller-tag {
+    background: #f0fdfa;
+    color: #164e63;
+    border-color: #99f6e4;
+}
+
+/* Animations */
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.series-item {
+    animation: slideIn 0.3s ease-out;
+}

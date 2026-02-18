@@ -7,8 +7,8 @@ let rightLibraryId = null;
 let leftSelectedSeries = new Set();
 let rightSelectedSeries = new Set();
 let transferCount = 0;
-let leftFilter = 'all';
-let rightFilter = 'all';
+let leftBadgeFilter = 'all';
+let rightBadgeFilter = 'all';
 let leftSeriesData = [];
 let rightSeriesData = [];
 
@@ -60,8 +60,8 @@ async function loadLeftLibrary() {
 
     leftLibraryId = libraryId;
     leftSelectedSeries.clear();
-    leftFilter = 'all';
-    updateFilterButtons('left');
+    leftBadgeFilter = 'all';
+    updateBadgeFilterButtons('left');
     await loadLibrarySeries(libraryId, 'left');
     updateMoveButtons();
 }
@@ -80,8 +80,8 @@ async function loadRightLibrary() {
 
     rightLibraryId = libraryId;
     rightSelectedSeries.clear();
-    rightFilter = 'all';
-    updateFilterButtons('right');
+    rightBadgeFilter = 'all';
+    updateBadgeFilterButtons('right');
     await loadLibrarySeries(libraryId, 'right');
     updateMoveButtons();
 }
@@ -96,7 +96,32 @@ async function loadLibrarySeries(libraryId, side) {
 
         // Ajouter la propriété isComplete à chaque série
         data.series.forEach(series => {
-            series.isComplete = !series.missing_volumes || series.missing_volumes === '';
+            // Gérer missing_volumes qui peut être un array ou un JSON string
+            let missingVolumes = [];
+            if (series.missing_volumes) {
+                if (Array.isArray(series.missing_volumes)) {
+                    missingVolumes = series.missing_volumes;
+                } else if (typeof series.missing_volumes === 'string') {
+                    try {
+                        missingVolumes = JSON.parse(series.missing_volumes);
+                    } catch {
+                        missingVolumes = [];
+                    }
+                }
+            }
+            series.missing_volumes = missingVolumes;
+            series.isComplete = !series.missing_volumes || series.missing_volumes.length === 0;
+            
+            // Assurer que tags est un array
+            if (!series.tags) {
+                series.tags = [];
+            } else if (typeof series.tags === 'string') {
+                try {
+                    series.tags = JSON.parse(series.tags);
+                } catch {
+                    series.tags = [];
+                }
+            }
         });
 
         // Stocker les données brutes
@@ -115,11 +140,54 @@ async function loadLibrarySeries(libraryId, side) {
 }
 
 /**
+ * Calcule le badge d'une série (même logique que dans library.js)
+ */
+function calculateSeriesBadge(series) {
+    const colors = {
+        complete: '#10b981',    // vert
+        ongoing: '#ef4444',     // rouge
+        incomplete: '#f59e0b',  // orange
+        missing: '#3b82f6'      // bleu
+    };
+    
+    const hasNautiljonInfo = series.nautiljon_total_volumes;
+    const hasMissingVolumes = series.missing_volumes && series.missing_volumes.length > 0;
+    const isNautiljonComplete = series.nautiljon_status && (
+        series.nautiljon_status.toLowerCase().includes('terminé') || 
+        series.nautiljon_status.toLowerCase().includes('termin')
+    );
+    
+    // Logique des badges
+    // 1. "Finie" : volumes locaux = volumes Nautiljon
+    if (hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes && !hasMissingVolumes) {
+        return 'complete';
+    }
+    
+    // 2. "Manquant" : série terminée sur Nautiljon ET volumes manquants
+    if (isNautiljonComplete && hasMissingVolumes) {
+        return 'missing';
+    }
+    
+    // 3. "Incomplet" : volumes manquants ET série pas terminée sur Nautiljon
+    if (hasMissingVolumes && !isNautiljonComplete) {
+        return 'incomplete';
+    }
+    
+    // 4. "En cours" : volumes ne correspondent pas
+    if (hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes) {
+        return 'ongoing';
+    }
+    
+    // Pas de badge si pas d'info Nautiljon
+    return 'none';
+}
+
+/**
  * Affiche les séries filtrées pour un panneau donné
  */
 function displayFilteredSeries(side) {
     const seriesData = side === 'left' ? leftSeriesData : rightSeriesData;
-    const currentFilter = side === 'left' ? leftFilter : rightFilter;
+    const currentBadgeFilter = side === 'left' ? leftBadgeFilter : rightBadgeFilter;
     const containerId = `${side}-series-container`;
     const container = document.getElementById(containerId);
 
@@ -128,16 +196,14 @@ function displayFilteredSeries(side) {
         return;
     }
 
-    // Appliquer le filtre
+    // Appliquer le filtre de badge
     let filteredSeries = seriesData;
-    if (currentFilter === 'complete') {
-        filteredSeries = seriesData.filter(s => s.isComplete);
-    } else if (currentFilter === 'incomplete') {
-        filteredSeries = seriesData.filter(s => !s.isComplete);
+    if (currentBadgeFilter !== 'all') {
+        filteredSeries = filteredSeries.filter(s => calculateSeriesBadge(s) === currentBadgeFilter);
     }
 
     if (filteredSeries.length === 0) {
-        container.innerHTML = '<p class="placeholder">Aucune série matching le filtre</p>';
+        container.innerHTML = '<p class="placeholder">Aucune série avec ce statut</p>';
         return;
     }
 
@@ -172,6 +238,49 @@ function displayFilteredSeries(side) {
 
         info.appendChild(title);
         info.appendChild(details);
+
+        // Ajouter le badge
+        const badgeType = calculateSeriesBadge(series);
+        if (badgeType !== 'none') {
+            const badgeColors = {
+                complete: '#10b981',
+                ongoing: '#ef4444',
+                incomplete: '#f59e0b',
+                missing: '#3b82f6'
+            };
+            const badgeTexts = {
+                complete: '✅ Finie',
+                ongoing: '🔄 En cours',
+                incomplete: '⚠️ Incomplet',
+                missing: '📚 Manquant'
+            };
+            
+            const badge = document.createElement('span');
+            badge.className = 'series-badge';
+            badge.style.cssText = `background: ${badgeColors[badgeType]}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: 500; display: inline-block; margin-top: 5px;`;
+            badge.textContent = badgeTexts[badgeType];
+            info.appendChild(badge);
+        }
+
+        // Ajouter les tags s'ils existent
+        if (series.tags && series.tags.length > 0) {
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'series-tags';
+            
+            series.tags.forEach(tag => {
+                const tagBadge = document.createElement('span');
+                tagBadge.className = 'tag-badge';
+                tagBadge.textContent = tag;
+                
+                // Ajouter une classe basée sur le tag pour les couleurs
+                const tagClass = tag.toLowerCase().replace(/\s+/g, '-') + '-tag';
+                tagBadge.classList.add(tagClass);
+                
+                tagsDiv.appendChild(tagBadge);
+            });
+            
+            info.appendChild(tagsDiv);
+        }
 
         item.appendChild(checkbox);
         item.appendChild(info);
@@ -337,38 +446,45 @@ function updateCompletionStat() {
 /**
  * Bascule le filtre du panneau gauche
  */
-function toggleLeftFilter(filterType) {
-    leftFilter = filterType;
-    updateFilterButtons('left');
+/**
+ * Bascule le filtre de badge du panneau gauche
+ */
+function toggleLeftBadgeFilter(badgeType) {
+    leftBadgeFilter = badgeType;
+    updateBadgeFilterButtons('left');
     displayFilteredSeries('left');
 }
 
 /**
- * Bascule le filtre du panneau droite
+ * Bascule le filtre de badge du panneau droite
  */
-function toggleRightFilter(filterType) {
-    rightFilter = filterType;
-    updateFilterButtons('right');
+function toggleRightBadgeFilter(badgeType) {
+    rightBadgeFilter = badgeType;
+    updateBadgeFilterButtons('right');
     displayFilteredSeries('right');
 }
 
 /**
- * Met à jour l'état visuel des boutons de filtre
+ * Met à jour l'état visuel des boutons de filtre de badge
  */
-function updateFilterButtons(side) {
-    const currentFilter = side === 'left' ? leftFilter : rightFilter;
-    const panel = side === 'left' ? document.querySelector('.left-panel') : document.querySelector('.right-panel');
-    const buttons = panel.querySelectorAll('.filter-btn');
+function updateBadgeFilterButtons(side) {
+    const panelClass = side === 'left' ? '.left-panel' : '.right-panel';
+    const panel = document.querySelector(panelClass);
+    
+    if (!panel) return;
+    
+    const buttons = panel.querySelectorAll('.badge-filter-btn');
+    const currentBadgeFilter = side === 'left' ? leftBadgeFilter : rightBadgeFilter;
     
     buttons.forEach(btn => {
-        const filterType = btn.getAttribute('data-filter');
-        if (filterType === currentFilter) {
+        if (btn.getAttribute('data-badge') === currentBadgeFilter) {
             btn.classList.add('active');
         } else {
             btn.classList.remove('active');
         }
     });
 }
+
 
 /**
  * Affiche une notification temporaire
@@ -394,9 +510,9 @@ function clearPanelLeft() {
     leftLibraryId = null;
     leftSelectedSeries.clear();
     leftSeriesData = [];
-    leftFilter = 'all';
+    leftBadgeFilter = 'all';
     updateSelectionCount('left');
-    updateFilterButtons('left');
+    updateBadgeFilterButtons('left');
     updateMoveButtons();
 }
 
@@ -409,9 +525,43 @@ function clearPanelRight() {
     rightLibraryId = null;
     rightSelectedSeries.clear();
     rightSeriesData = [];
-    rightFilter = 'all';
+    rightBadgeFilter = 'all';
     updateSelectionCount('right');
-    updateFilterButtons('right');
+    updateBadgeFilterButtons('right');
+    updateMoveButtons();
+}
+
+/**
+ * Sélectionne tous les éléments filtrés du côté spécifié
+ */
+function selectAllFiltered(side) {
+    const seriesData = side === 'left' ? leftSeriesData : rightSeriesData;
+    const currentBadgeFilter = side === 'left' ? leftBadgeFilter : rightBadgeFilter;
+    const selectedSet = side === 'left' ? leftSelectedSeries : rightSelectedSeries;
+    const containerId = `${side}-series-container`;
+    const container = document.getElementById(containerId);
+
+    // Filtrer les séries selon le filtre actuel
+    let filteredSeries = seriesData;
+    if (currentBadgeFilter !== 'all') {
+        filteredSeries = filteredSeries.filter(s => calculateSeriesBadge(s) === currentBadgeFilter);
+    }
+
+    // Sélectionner toutes les séries filtrées
+    filteredSeries.forEach(series => {
+        selectedSet.add(series.id);
+        const itemId = `${side}-series-${series.id}`;
+        const item = document.getElementById(itemId);
+        if (item) {
+            item.classList.add('selected');
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        }
+    });
+
+    updateSelectionCount(side);
     updateMoveButtons();
 }
 

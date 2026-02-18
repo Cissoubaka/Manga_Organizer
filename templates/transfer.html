@@ -31,16 +31,16 @@
                         <select id="left-library-select" class="library-select" onchange="loadLeftLibrary()">
                             <option value="">-- Sélectionner une bibliothèque --</option>
                         </select>
-                        <div class="filter-buttons">
-                            <button class="filter-btn active" onclick="toggleLeftFilter('all')" data-filter="all">
-                                📚 Toutes les séries
-                            </button>
-                            <button class="filter-btn" onclick="toggleLeftFilter('complete')" data-filter="complete">
-                                ✅ Terminées
-                            </button>
-                            <button class="filter-btn" onclick="toggleLeftFilter('incomplete')" data-filter="incomplete">
-                                ⚠️ En cours
-                            </button>
+                        <div class="badge-filter-section">
+                            <label>Filtrer par statut:</label>
+                            <div class="badge-buttons">
+                                <button class="badge-filter-btn active" onclick="toggleLeftBadgeFilter('all')" data-badge="all" style="background: #667eea; color: white;">Tous</button>
+                                <button class="badge-filter-btn" onclick="toggleLeftBadgeFilter('complete')" data-badge="complete" style="background: #10b981; color: white;">✅ Finie</button>
+                                <button class="badge-filter-btn" onclick="toggleLeftBadgeFilter('missing')" data-badge="missing" style="background: #3b82f6; color: white;">📚 Manquant</button>
+                                <button class="badge-filter-btn" onclick="toggleLeftBadgeFilter('incomplete')" data-badge="incomplete" style="background: #f59e0b; color: white;">⚠️ Incomplet</button>
+                                <button class="badge-filter-btn" onclick="toggleLeftBadgeFilter('ongoing')" data-badge="ongoing" style="background: #ef4444; color: white;">🔄 En cours</button>
+                            </div>
+                            <button class="btn-select-all" onclick="selectAllFiltered('left')" style="margin-top: 10px; background: #667eea; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">✓ Tous sélectionner</button>
                         </div>
                     </div>
                     
@@ -66,16 +66,16 @@
                         <select id="right-library-select" class="library-select" onchange="loadRightLibrary()">
                             <option value="">-- Sélectionner une bibliothèque destination --</option>
                         </select>
-                        <div class="filter-buttons">
-                            <button class="filter-btn active" onclick="toggleRightFilter('all')" data-filter="all">
-                                📚 Toutes les séries
-                            </button>
-                            <button class="filter-btn" onclick="toggleRightFilter('complete')" data-filter="complete">
-                                ✅ Terminées
-                            </button>
-                            <button class="filter-btn" onclick="toggleRightFilter('incomplete')" data-filter="incomplete">
-                                ⚠️ En cours
-                            </button>
+                        <div class="badge-filter-section">
+                            <label>Filtrer par statut:</label>
+                            <div class="badge-buttons">
+                                <button class="badge-filter-btn active" onclick="toggleRightBadgeFilter('all')" data-badge="all" style="background: #667eea; color: white;">Tous</button>
+                                <button class="badge-filter-btn" onclick="toggleRightBadgeFilter('complete')" data-badge="complete" style="background: #10b981; color: white;">✅ Finie</button>
+                                <button class="badge-filter-btn" onclick="toggleRightBadgeFilter('missing')" data-badge="missing" style="background: #3b82f6; color: white;">📚 Manquant</button>
+                                <button class="badge-filter-btn" onclick="toggleRightBadgeFilter('incomplete')" data-badge="incomplete" style="background: #f59e0b; color: white;">⚠️ Incomplet</button>
+                                <button class="badge-filter-btn" onclick="toggleRightBadgeFilter('ongoing')" data-badge="ongoing" style="background: #ef4444; color: white;">🔄 En cours</button>
+                            </div>
+                            <button class="btn-select-all" onclick="selectAllFiltered('right')" style="margin-top: 10px; background: #667eea; color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">✓ Tous sélectionner</button>
                         </div>
                     </div>
                     

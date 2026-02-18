@@ -128,7 +128,7 @@ class Config:
 
     @staticmethod
     def _add_nautiljon_columns(conn, db_path):
-        """Ajoute les colonnes Nautiljon à la table series si elles n'existent pas"""
+        """Ajoute les colonnes Nautiljon et tags à la table series si elles n'existent pas"""
         cursor = conn.cursor()
         
         nautiljon_columns = [
@@ -141,7 +141,8 @@ class Config:
             ('nautiljon_mangaka', 'TEXT'),
             ('nautiljon_year_start', 'INTEGER'),
             ('nautiljon_year_end', 'INTEGER'),
-            ('nautiljon_updated_at', 'TIMESTAMP')
+            ('nautiljon_updated_at', 'TIMESTAMP'),
+            ('tags', 'TEXT')  # JSON array de tags
         ]
         
         # Vérifier quelles colonnes existent

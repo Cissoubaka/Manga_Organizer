@@ -8,6 +8,7 @@ import sqlite3
 import json
 import os
 import time
+import shutil
 
 
 def get_db_connection():
@@ -828,7 +829,10 @@ def get_transfer_series(library_id):
             id, 
             title, 
             total_volumes,
-            missing_volumes
+            missing_volumes,
+            tags,
+            nautiljon_total_volumes,
+            nautiljon_status
         FROM series 
         WHERE library_id = ?
         ORDER BY title
@@ -836,11 +840,30 @@ def get_transfer_series(library_id):
     
     series_list = []
     for row in cursor.fetchall():
+        # Parsage des tags (JSON array stocké en texte)
+        tags = []
+        if row['tags']:
+            try:
+                tags = json.loads(row['tags'])
+            except (json.JSONDecodeError, TypeError):
+                tags = []
+        
+        # Parsage du missing_volumes (JSON array)
+        missing_volumes = []
+        if row['missing_volumes']:
+            try:
+                missing_volumes = json.loads(row['missing_volumes'])
+            except (json.JSONDecodeError, TypeError):
+                missing_volumes = []
+        
         series_list.append({
             'id': row['id'],
             'title': row['title'],
             'total_volumes': row['total_volumes'],
-            'missing_volumes': row['missing_volumes']
+            'missing_volumes': missing_volumes,
+            'tags': tags,
+            'nautiljon_total_volumes': row['nautiljon_total_volumes'],
+            'nautiljon_status': row['nautiljon_status']
         })
     
     conn.close()
@@ -854,7 +877,7 @@ def get_transfer_series(library_id):
 
 @library_bp.route('/api/transfer/move', methods=['POST'])
 def move_series():
-    """Transfère une série d'une bibliothèque à une autre"""
+    """Transfère une série d'une bibliothèque à une autre (fichiers + BD)"""
     data = request.get_json()
     
     series_id = data.get('series_id')
@@ -871,44 +894,167 @@ def move_series():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Vérifier que la série appartient bien à la bibliothèque source
-        cursor.execute('SELECT library_id FROM series WHERE id = ?', (series_id,))
-        result = cursor.fetchone()
+        # Récupérer les infos de la série
+        cursor.execute('''
+            SELECT id, library_id, title, path FROM series WHERE id = ?
+        ''', (series_id,))
+        series = cursor.fetchone()
         
-        if not result:
+        if not series:
             conn.close()
             return jsonify({'error': 'Série non trouvée'}), 404
         
-        if result['library_id'] != from_library_id:
+        if series['library_id'] != from_library_id:
             conn.close()
             return jsonify({'error': 'La série n\'appartient pas à cette bibliothèque'}), 400
         
-        # Vérifier que les deux bibliothèques existent
-        cursor.execute('SELECT id FROM libraries WHERE id IN (?, ?)', (from_library_id, to_library_id))
-        libraries = cursor.fetchall()
+        # Récupérer les infos des deux bibliothèques
+        cursor.execute('''
+            SELECT id, path FROM libraries WHERE id IN (?, ?)
+        ''', (from_library_id, to_library_id))
+        
+        libraries = {}
+        for lib in cursor.fetchall():
+            libraries[lib['id']] = lib['path']
         
         if len(libraries) != 2:
             conn.close()
             return jsonify({'error': 'Une ou plusieurs bibliothèques n\'existent pas'}), 404
         
-        # Effectuer le transfert
-        cursor.execute(
-            'UPDATE series SET library_id = ? WHERE id = ?',
-            (to_library_id, series_id)
-        )
+        from_lib_path = libraries[from_library_id]
+        to_lib_path = libraries[to_library_id]
         
-        conn.commit()
-        conn.close()
+        # Construire les chemins source et destination
+        # Si le chemin n'existe pas en BD, on le reconstruit
+        if series['path']:
+            old_series_path = series['path']
+        else:
+            old_series_path = os.path.join(from_lib_path, series['title'])
         
-        return jsonify({
-            'success': True,
-            'message': f'Série transférée vers la bibliothèque {to_library_id}'
-        })
+        new_series_path = os.path.join(to_lib_path, series['title'])
+        
+        # Vérifier que le chemin source existe
+        if not os.path.exists(old_series_path):
+            conn.close()
+            return jsonify({
+                'error': f'Le dossier de la série n\'existe pas: {old_series_path}'
+            }), 400
+        
+        try:
+            # Créer le dossier destination s'il n'existe pas
+            os.makedirs(to_lib_path, exist_ok=True)
+            
+            # Vérifier que la destination n'existe pas déjà
+            if os.path.exists(new_series_path):
+                conn.close()
+                return jsonify({
+                    'error': f'Une série avec ce nom existe déjà dans la destination'
+                }), 400
+            
+            # Déplacer le dossier de la série
+            shutil.move(old_series_path, new_series_path)
+            
+            # Mettre à jour le chemin de la série en BD
+            cursor.execute('''
+                UPDATE series SET library_id = ?, path = ? WHERE id = ?
+            ''', (to_library_id, new_series_path, series_id))
+            
+            # Récupérer et mettre à jour les chemins de tous les volumes
+            cursor.execute('''
+                SELECT id, filepath FROM volumes WHERE series_id = ?
+            ''', (series_id,))
+            
+            volumes = cursor.fetchall()
+            for volume in volumes:
+                old_volume_path = volume['filepath']
+                # Remplacer le chemin source par le chemin destination
+                new_volume_path = old_volume_path.replace(old_series_path, new_series_path, 1)
+                
+                cursor.execute('''
+                    UPDATE volumes SET filepath = ? WHERE id = ?
+                ''', (new_volume_path, volume['id']))
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Série transférée avec succès vers la bibliothèque {to_library_id}',
+                'new_path': new_series_path
+            })
+        
+        except Exception as e:
+            conn.close()
+            print(f"❌ Erreur lors du déplacement des fichiers: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'error': f'Erreur lors du déplacement des fichiers: {str(e)}'
+            }), 500
     
     except Exception as e:
+        print(f"❌ Erreur transfert série: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/series/<int:series_id>/tags', methods=['GET', 'PUT'])
+def manage_series_tags(series_id):
+    """Récupère ou met à jour les tags d'une série"""
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if request.method == 'GET':
+        # Récupérer les tags
+        cursor.execute('SELECT tags FROM series WHERE id = ?', (series_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': 'Série non trouvée'}), 404
+        
+        tags = []
+        if result['tags']:
+            try:
+                tags = json.loads(result['tags'])
+            except (json.JSONDecodeError, TypeError):
+                tags = []
+        
+        return jsonify({'tags': tags})
+    
+    elif request.method == 'PUT':
+        # Mettre à jour les tags
+        data = request.get_json()
+        tags = data.get('tags', [])
+        
+        # Valider que c'est une liste de strings
+        if not isinstance(tags, list):
+            conn.close()
+            return jsonify({'error': 'Les tags doivent être une liste'}), 400
+        
+        tags_list = [str(tag).strip() for tag in tags if tag]
+        
+        try:
+            # Mettre à jour les tags comme JSON
+            cursor.execute(
+                'UPDATE series SET tags = ? WHERE id = ?',
+                (json.dumps(tags_list), series_id)
+            )
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'tags': tags_list,
+                'message': 'Tags mis à jour avec succès'
+            })
+        
+        except Exception as e:
+            conn.close()
+            return jsonify({'error': str(e)}), 500
 
 def cleanup_empty_directories(base_path):
     """

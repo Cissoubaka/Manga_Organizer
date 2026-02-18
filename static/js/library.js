@@ -420,6 +420,17 @@ async function viewSeries(seriesId) {
                     ${data.total_volumes} volume(s) dans la collection
                     ${data.has_parts ? ' • Série avec arcs/parties' : ''}
                 </p>
+                <!-- Tags Management Section -->
+                <div style="margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 6px;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.95em;">🏷️ Tags</h4>
+                    <div id="tags-list-${seriesId}" style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+                        <!-- Les tags seront chargés ici -->
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="new-tag-input-${seriesId}" placeholder="Ajouter un tag..." style="flex: 1; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9em;">
+                        <button onclick="addTagToSeries(${seriesId})" class="btn" style="padding: 6px 12px; font-size: 0.9em;">Ajouter</button>
+                    </div>
+                </div>
                 ${data.missing_volumes.length > 0 ? 
                     `<div class="missing-volumes-section" style="margin-top: 20px;">
                         <h3 class="missing-volumes-title">⚠️ Volumes manquants</h3>
@@ -440,6 +451,10 @@ async function viewSeries(seriesId) {
             </div>
             ${volumesHtml}
         `;
+        
+        // Charger et afficher les tags
+        await loadAndDisplayTags(seriesId);
+        
         // Attacher écouteurs aux cartes de volumes manquants (évite handlers inline cassés par apostrophes)
         modalBody.querySelectorAll('.missing-volume-card').forEach(card => {
             card.addEventListener('click', (e) => {
@@ -723,6 +738,128 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+/**
+ * Charge et affiche les tags d'une série
+ */
+async function loadAndDisplayTags(seriesId) {
+    try {
+        const response = await fetch(`/api/series/${seriesId}/tags`);
+        const data = await response.json();
+        
+        const tagsList = document.getElementById(`tags-list-${seriesId}`);
+        if (!tagsList) return;
+        
+        tagsList.innerHTML = '';
+        
+        if (data.tags && data.tags.length > 0) {
+            data.tags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.className = 'tag-badge';
+                tagElement.style.cssText = 'display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: #dbeafe; color: #1e40af; border-radius: 12px; font-size: 0.85em; font-weight: 500; border: 1px solid #93c5fd;';
+                tagElement.innerHTML = `
+                    ${escapeHtml(tag)}
+                    <button onclick="removeTagFromSeries(${seriesId}, '${tag.replace(/'/g, "\\'")}', event)" style="background: none; border: none; color: #1e40af; cursor: pointer; font-weight: bold; padding: 0; margin-left: 3px;">×</button>
+                `;
+                tagsList.appendChild(tagElement);
+            });
+        } else {
+            tagsList.innerHTML = '<p style="margin: 0; color: #6b7280; font-size: 0.9em;">Aucun tag</p>';
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des tags:', error);
+    }
+}
+
+/**
+ * Ajoute un tag à une série
+ */
+async function addTagToSeries(seriesId) {
+    const input = document.getElementById(`new-tag-input-${seriesId}`);
+    const tagText = input.value.trim();
+    
+    if (!tagText) {
+        alert('Veuillez entrer un tag');
+        return;
+    }
+    
+    try {
+        // Charger les tags actuels
+        const response = await fetch(`/api/series/${seriesId}/tags`);
+        const data = await response.json();
+        
+        let tags = data.tags || [];
+        
+        // Vérifier que le tag n'existe pas déjà
+        if (tags.includes(tagText)) {
+            alert('Ce tag existe déjà');
+            input.value = '';
+            return;
+        }
+        
+        // Ajouter le nouveau tag
+        tags.push(tagText);
+        
+        // Sauvegarder
+        const updateResponse = await fetch(`/api/series/${seriesId}/tags`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tags: tags })
+        });
+        
+        if (updateResponse.ok) {
+            input.value = '';
+            await loadAndDisplayTags(seriesId);
+            // Recharger les données de la bibliothèque pour mettre à jour les filtres
+            loadLibraryData();
+        } else {
+            alert('Erreur lors de l\'ajout du tag');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur lors de l\'ajout du tag');
+    }
+}
+
+/**
+ * Supprime un tag d'une série
+ */
+async function removeTagFromSeries(seriesId, tag, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    try {
+        // Charger les tags actuels
+        const response = await fetch(`/api/series/${seriesId}/tags`);
+        const data = await response.json();
+        
+        let tags = data.tags || [];
+        
+        // Supprimer le tag
+        tags = tags.filter(t => t !== tag);
+        
+        // Sauvegarder
+        const updateResponse = await fetch(`/api/series/${seriesId}/tags`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tags: tags })
+        });
+        
+        if (updateResponse.ok) {
+            await loadAndDisplayTags(seriesId);
+            // Recharger les données de la bibliothèque pour mettre à jour les filtres
+            loadLibraryData();
+        } else {
+            alert('Erreur lors de la suppression du tag');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur lors de la suppression du tag');
+    }
+}
 window.onclick = function(event) {
     const modal = document.getElementById('series-modal');
     const searchModal = document.getElementById('search-ed2k-modal');

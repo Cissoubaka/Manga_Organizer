@@ -323,18 +323,18 @@ class NautiljonScraper:
 class NautiljonDatabase:
     """Gère la sauvegarde des infos Nautiljon dans la BDD"""
     
-    NAUTILJON_SCHEMA = """
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_url TEXT;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_cover_path TEXT;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_total_volumes INTEGER;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_french_volumes INTEGER;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_editor TEXT;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_status TEXT;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_mangaka TEXT;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_year_start INTEGER;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_year_end INTEGER;
-        ALTER TABLE series ADD COLUMN IF NOT EXISTS nautiljon_updated_at TIMESTAMP;
-    """
+    NAUTILJON_COLUMNS = [
+        ('nautiljon_url', 'TEXT'),
+        ('nautiljon_cover_path', 'TEXT'),
+        ('nautiljon_total_volumes', 'INTEGER'),
+        ('nautiljon_french_volumes', 'INTEGER'),
+        ('nautiljon_editor', 'TEXT'),
+        ('nautiljon_status', 'TEXT'),
+        ('nautiljon_mangaka', 'TEXT'),
+        ('nautiljon_year_start', 'INTEGER'),
+        ('nautiljon_year_end', 'INTEGER'),
+        ('nautiljon_updated_at', 'TIMESTAMP'),
+    ]
     
     def __init__(self, db_path):
         self.db_path = db_path
@@ -346,15 +346,18 @@ class NautiljonDatabase:
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             cursor = conn.cursor()
             
-            # Exécute chaque ajout de colonne séparément pour éviter les erreurs
-            statements = self.NAUTILJON_SCHEMA.strip().split(';')
-            for statement in statements:
-                if statement.strip():
+            # Récupère les colonnes existantes de la table series
+            cursor.execute("PRAGMA table_info(series)")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            
+            # Crée les colonnes manquantes
+            for col_name, col_type in self.NAUTILJON_COLUMNS:
+                if col_name not in existing_columns:
                     try:
-                        cursor.execute(statement.strip())
+                        cursor.execute(f"ALTER TABLE series ADD COLUMN {col_name} {col_type}")
+                        logger.info(f"Colonne {col_name} créée")
                     except sqlite3.OperationalError as e:
-                        if 'already exists' not in str(e):
-                            logger.warning(f"Attention lors de l'init schema: {e}")
+                        logger.warning(f"Erreur création colonne {col_name}: {e}")
             
             conn.commit()
             conn.close()

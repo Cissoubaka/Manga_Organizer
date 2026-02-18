@@ -1,6 +1,7 @@
 //const libraryId = {{ library_id }};
 let seriesData = [];
 let showOnlyMissing = false;
+let showOnlyUnenriched = false;
 let seriesStatusFilter = 'all'; // 'all', 'completed', 'ongoing'
 let currentSeriesTitle = '';
 
@@ -130,6 +131,10 @@ function filterSeries() {
         filtered = filtered.filter(s => s.missing_volumes.length > 0);
     }
     
+    if (showOnlyUnenriched) {
+        filtered = filtered.filter(s => !s.nautiljon_url);
+    }
+    
     if (seriesStatusFilter === 'completed') {
         filtered = filtered.filter(s => 
             s.nautiljon_status && 
@@ -174,6 +179,21 @@ function toggleMissingFilter() {
         btn.style.background = '#10b981';
     } else {
         btn.textContent = '⚠️ Volumes manquants uniquement';
+        btn.style.background = '#667eea';
+    }
+    
+    filterSeries();
+}
+
+function toggleUnenrichedFilter() {
+    showOnlyUnenriched = !showOnlyUnenriched;
+    const btn = document.getElementById('filter-unenriched-btn');
+    
+    if (showOnlyUnenriched) {
+        btn.textContent = '✅ Afficher toutes les séries';
+        btn.style.background = '#10b981';
+    } else {
+        btn.textContent = '🔍 Séries non enrichies';
         btn.style.background = '#667eea';
     }
     

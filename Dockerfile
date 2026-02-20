@@ -31,7 +31,21 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copier le code de l'application
+# Copier les fichiers Python critiques
+COPY app.py .
+COPY config.py .
+COPY encryption.py .
+COPY run.py .
+COPY docker-entrypoint.sh .
+
+# Copier les blueprints
+COPY blueprints/ ./blueprints/
+
+# Copier les dossiers statiques et templates
+COPY static/ ./static/
+COPY templates/ ./templates/
+
+# Copier les autres fichiers de configuration
 COPY . .
 
 # Rendre le script d'entrypoint exécutable

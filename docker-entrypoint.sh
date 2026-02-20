@@ -10,4 +10,4 @@ if ! command -v amulecmd &> /dev/null; then
 fi
 
 # Démarrer l'application Flask
-exec python3 -c "from app import create_app; app = create_app('production'); app.run(host='0.0.0.0', port=5000)"
+exec python3 run.py

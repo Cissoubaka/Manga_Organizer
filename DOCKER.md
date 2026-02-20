@@ -49,7 +49,7 @@ docker stop manga-organizer
 docker rm manga-organizer
 ```
 
-## Utilisation de l'image Docker Hub
+## Utilisation de l'image Docker Hub : https://hub.docker.com/r/cissoubaka/manga-organizer
 
 ### Option 3 : Avec `docker run` (image pré-construite)
 

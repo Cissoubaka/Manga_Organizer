@@ -34,6 +34,9 @@
                 <button class="tab-button" onclick="switchTab('prowlarr')">
                     🔍 Prowlarr
                 </button>
+                <button class="tab-button" onclick="switchTab('qbittorrent')">
+                    ⚡ qBittorrent
+                </button>
                 <button class="tab-button" onclick="switchTab('badges')">
                     🎨 Badges
                 </button>
@@ -383,6 +386,138 @@
                                         <li>✅ Vérifiez que la clé API est correcte</li>
                                         <li>✅ Vérifiez que le port est accessible (pare-feu)</li>
                                         <li>✅ Essayez d'accéder à Prowlarr dans votre navigateur pour vérifier que ça fonctionne</li>
+                                    </ul>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Onglet qBittorrent -->
+                <div class="tab-content" id="tab-qbittorrent">
+                    <div class="settings-section">
+                        <div class="section-header">
+                            <h2>⚡ Configuration qBittorrent</h2>
+                            <p class="section-description">
+                                Configurez la connexion à votre serveur qBittorrent pour ajouter automatiquement 
+                                les torrents depuis l'interface.
+                            </p>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" id="qbittorrentEnabled">
+                                <label for="qbittorrentEnabled">
+                                    <strong>Activer l'intégration qBittorrent</strong>
+                                    <span class="help-text">Permet d'ajouter des torrents directement depuis l'application</span>
+                                </label>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="qbittorrentUrl">URL du serveur</label>
+                                    <input type="text" id="qbittorrentUrl" placeholder="http://localhost">
+                                    <small class="help-text">Adresse du serveur qBittorrent (sans :port ni http://stream)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="qbittorrentPort">Port</label>
+                                    <input type="number" id="qbittorrentPort" value="8080" placeholder="8080">
+                                    <small class="help-text">Port du Web UI de qBittorrent (défaut: 8080)</small>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="qbittorrentUsername">Nom d'utilisateur</label>
+                                    <input type="text" id="qbittorrentUsername" placeholder="Optionnel">
+                                    <small class="help-text">Nom d'utilisateur du Web UI (optionnel)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="qbittorrentPassword">Mot de passe</label>
+                                    <div class="password-input-group">
+                                        <input type="password" id="qbittorrentPassword" placeholder="Optionnel">
+                                        <button type="button" class="btn-toggle-password" onclick="toggleQbittorrentPassword()">
+                                            👁️ Afficher
+                                        </button>
+                                    </div>
+                                    <small class="help-text">Mot de passe du Web UI (optionnel)</small>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="qbittorrentDefaultCategory">Catégorie par défaut (optionnel)</label>
+                                    <select id="qbittorrentDefaultCategory" style="
+                                        width: 100%;
+                                        padding: 10px;
+                                        border: 1px solid #ddd;
+                                        border-radius: 5px;
+                                        font-size: 1em;
+                                    ">
+                                        <option value="">-- Aucune catégorie --</option>
+                                    </select>
+                                    <small class="help-text">La catégorie utilisée par défaut pour les torrents ajoutés (chargée depuis qBittorrent)</small>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-success" onclick="saveQbittorrentSettings()">
+                                    💾 Enregistrer
+                                </button>
+                                <button class="btn" onclick="testQbittorrentConnection()">
+                                    🔌 Tester la connexion
+                                </button>
+                                <button class="btn" onclick="resetQbittorrentSettings()">
+                                    🔄 Réinitialiser
+                                </button>
+                            </div>
+
+                            <div id="qbittorrentMessage" class="message"></div>
+                        </div>
+
+                        <!-- Aide configuration -->
+                        <div class="help-section">
+                            <h3>📖 Aide à la configuration</h3>
+                            
+                            <details class="help-details">
+                                <summary>Comment accéder au Web UI de qBittorrent ?</summary>
+                                <div class="help-content">
+                                    <ol>
+                                        <li>Ouvrez qBittorrent sur votre ordinateur ou serveur</li>
+                                        <li>Allez dans <strong>Outils > Options</strong></li>
+                                        <li>Sélectionnez <strong>Web UI</strong> dans le menu de gauche</li>
+                                        <li>Cochez <strong>"Activer le serveur Web"</strong></li>
+                                        <li>Notez le <strong>Port</strong> (défaut: 8080)</li>
+                                        <li>Définissez un nom d'utilisateur et un mot de passe si souhaité</li>
+                                        <li>Cliquez OK et redémarrez qBittorrent</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>Comment accéder à qBittorrent depuis une autre machine ?</summary>
+                                <div class="help-content">
+                                    <ul>
+                                        <li>Si qBittorrent est sur la même machine : <code>http://localhost:8080</code> ou <code>http://127.0.0.1:8080</code></li>
+                                        <li>Si qBittorrent est sur une autre machine du réseau : <code>http://192.168.1.100:8080</code> (remplacez par l'IP)</li>
+                                        <li>Assurez-vous que le port est accessible (pare-feu)</li>
+                                        <li>En HTTPS, utilisez <code>https://</code> au lieu de <code>http://</code></li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <details class="help-details">
+                                <summary>La connexion échoue, que faire ?</summary>
+                                <div class="help-content">
+                                    <ul>
+                                        <li>✅ Vérifiez que qBittorrent est bien démarré</li>
+                                        <li>✅ Vérifiez que le Web UI est activé dans les options</li>
+                                        <li>✅ Vérifiez que l'URL et le port sont corrects</li>
+                                        <li>✅ Vérifiez les identifiants (si configurés)</li>
+                                        <li>✅ Vérifiez que le port est accessible (pare-feu)</li>
+                                        <li>✅ Essayez d'accéder au Web UI dans votre navigateur pour vérifier</li>
                                     </ul>
                                 </div>
                             </details>

@@ -223,6 +223,25 @@ def scan_library(library_id):
         }), 500
 
 
+@library_bp.route('/api/scan/series/<int:series_id>', methods=['POST'])
+def scan_series(series_id):
+    """Scanne une seule série (met à jour ses volumes)"""
+    
+    try:
+        scanner = LibraryScanner()
+        volumes_count = scanner.scan_single_series(series_id)
+        
+        return jsonify({'success': True, 'volumes_count': volumes_count})
+    
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Erreur lors du scan de la série {series_id}: {error_msg}")
+        return jsonify({
+            'success': False, 
+            'error': f'Erreur lors du scan: {error_msg}'
+        }), 500
+
+
 @library_bp.route('/api/library/<int:library_id>/enrich', methods=['POST'])
 def enrich_library(library_id):
     """Enrichit toutes les séries sans infos Nautiljon d'une bibliothèque"""

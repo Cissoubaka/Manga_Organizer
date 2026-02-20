@@ -163,7 +163,7 @@
                     <h1>🌊 Enrichissement Nautiljon</h1>
                     <p style="margin: 10px 0 0 0; opacity: 0.9;">Enrichissez vos séries avec les infos de Nautiljon.com</p>
                 </div>
-                <a href="/" class="btn" style="background: #6c757d; white-space: nowrap;">← Retour à l'accueil</a>
+                <a id="back-button" href="/" class="btn" style="background: #6c757d; white-space: nowrap;">← Retour à l'accueil</a>
             </div>
         </div>
 
@@ -307,6 +307,13 @@
         const urlParams = new URLSearchParams(window.location.search);
         const initialLibraryId = urlParams.get('libraryId');
         const initialSeriesId = urlParams.get('seriesId');
+
+        // Mettre à jour le bouton de retour en fonction de la source
+        const backButton = document.getElementById('back-button');
+        if (initialLibraryId) {
+            backButton.href = `/library/${initialLibraryId}`;
+            backButton.textContent = '← Retour à la bibliothèque';
+        }
 
         function switchTab(tabName) {
             // Cache tous les tabs

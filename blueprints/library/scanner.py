@@ -179,7 +179,7 @@ class LibraryScanner:
                 r'v[\s\.]?(\d+)',                 # v4, v.4
                 r'#(\d+)',                        # #4
                 r'-\s*(\d+)(?:\s|$)',             # - 08 (à la fin ou suivi d'espace)
-                r'\s(\d{1,2})\s*(?:\(|\[)',       # 01 ( ou 01 [ - nombre avant parenthèse/crochet
+                r'\s(\d{1,2})\s+(?=[A-Za-z])',   # 08 Noda - nombre suivi d'espace(s) et d'une lettre (ex: Golden kamui 08 Noda)
                 r'\s(\d+)\s*(?:FR|EN|VF|VO)',    # 09 FR (nombre avant langue)
                 r'\s(\d{1,3})$'                   # 08 (nombre de 1-3 chiffres à la fin, évite les années)
             ]
@@ -559,6 +559,112 @@ class LibraryScanner:
         conn.close()
 
         return len(series_data)
+    
+    def scan_single_series(self, series_id):
+        """Scanne une seule série (met à jour ses volumes)
+        
+        Args:
+            series_id: ID de la série à scanner
+            
+        Returns:
+            Nombre de volumes détectés
+        """
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        cursor = conn.cursor()
+        
+        # Récupérer les infos de la série
+        cursor.execute('''
+            SELECT id, library_id, title, path FROM series WHERE id = ?
+        ''', (series_id,))
+        
+        result = cursor.fetchone()
+        if not result:
+            conn.close()
+            raise Exception(f"Série {series_id} non trouvée")
+        
+        series_id, library_id, series_title, series_path = result
+        
+        # Vérifier que le chemin existe
+        if not series_path or not os.path.exists(series_path):
+            conn.close()
+            raise Exception(f"Le répertoire de la série n'existe pas: {series_path}")
+        
+        print(f"\n📂 Scan de la série: {series_title}")
+        
+        # Extensions supportées
+        supported_extensions = {'.cbz', '.cbr', '.zip', '.rar', '.pdf', '.epub'}
+        
+        # Lister les fichiers dans le répertoire de la série
+        volumes_data = []
+        
+        try:
+            for filename in os.listdir(series_path):
+                filepath = os.path.join(series_path, filename)
+                
+                # Ignorer les sous-répertoires
+                if os.path.isdir(filepath):
+                    continue
+                
+                ext = os.path.splitext(filename)[1].lower()
+                
+                if ext in supported_extensions:
+                    parsed = self.parse_filename(filename)
+                    volumes_data.append({
+                        'filename': filename,
+                        'filepath': filepath,
+                        'parsed': parsed,
+                        'file_size': os.path.getsize(filepath)
+                    })
+        except (PermissionError, OSError) as e:
+            conn.close()
+            raise Exception(f"Impossible d'accéder au répertoire: {e}")
+        
+        # Supprimer les anciens volumes de cette série
+        cursor.execute('DELETE FROM volumes WHERE series_id = ?', (series_id,))
+        
+        # Insérer les nouveaux volumes
+        for volume in volumes_data:
+            parsed = volume['parsed']
+            
+            # Récupère le nombre de pages
+            page_count = self.get_page_count(volume['filepath'], parsed['format'])
+            
+            try:
+                cursor.execute('''
+                    INSERT INTO volumes (
+                        series_id, part_number, part_name, volume_number,
+                        filename, filepath, author, year, resolution,
+                        file_size, page_count, format
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    series_id,
+                    parsed['part_number'],
+                    parsed['part_name'],
+                    parsed['volume'],
+                    volume['filename'],
+                    volume['filepath'],
+                    parsed['author'] or None,
+                    parsed['year'] or None,
+                    parsed['resolution'] or None,
+                    volume['file_size'],
+                    page_count,
+                    parsed['format']
+                ))
+            except Exception as e:
+                print(f"⚠️  Erreur lors du traitement de {volume['filename']}: {e}")
+                continue
+        
+        conn.commit()
+        
+        # Mettre à jour les stats de la série
+        self.update_series_stats(series_id, conn)
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✓ {series_title}: {len(volumes_data)} volumes")
+        
+        return len(volumes_data)
         
         
     def update_series_stats(self, series_id, conn=None):

@@ -61,7 +61,7 @@ docker run -d \
 # http://localhost:5000
 ```
 
-Ou avec `docker-compose` en modifiant le `docker-compose.yml` :
+Ou avec `docker compose` en modifiant le `docker-compose.example.yml` :
 
 ```yaml
 services:

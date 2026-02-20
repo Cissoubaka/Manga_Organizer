@@ -52,6 +52,16 @@ class Config:
         'selected_indexers': []
     }
     
+    # qBittorrent par défaut
+    QBITTORRENT_CONFIG_FILE = os.path.join(DATA_DIR, 'qbittorrent_config.json')
+    QBITTORRENT_CONFIG = {
+        'enabled': False,
+        'url': 'http://127.0.0.1',
+        'port': 8080,
+        'username': '',
+        'password': ''
+    }
+    
     @staticmethod
     def init_app(app):
         """Initialise les répertoires et la base de données"""

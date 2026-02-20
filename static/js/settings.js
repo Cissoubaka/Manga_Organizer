@@ -667,6 +667,141 @@ function resetBadgeColors() {
     saveBadgeColors();
 }
 
+// ===== QBITTORRENT =====
+let qbittorrentPasswordVisible = false;
+
+async function loadQbittorrentSettings() {
+    try {
+        const response = await fetch('/api/qbittorrent/config');
+        const config = await response.json();
+        
+        document.getElementById('qbittorrentEnabled').checked = config.enabled;
+        document.getElementById('qbittorrentUrl').value = config.url || '';
+        document.getElementById('qbittorrentPort').value = config.port || 8080;
+        document.getElementById('qbittorrentUsername').value = config.username || '';
+        
+        // Charger le mot de passe déchiffré
+        if (config.password) {
+            document.getElementById('qbittorrentPassword').value = config.password;
+        }
+        
+        // Charger les catégories disponibles D'ABORD
+        await loadQbittorrentCategories();
+        
+        // PUIS mettre la catégorie sauvegardée après que les options soient chargées
+        if (config.default_category) {
+            document.getElementById('qbittorrentDefaultCategory').value = config.default_category;
+        }
+    } catch (error) {
+        showMessage('qbittorrentMessage', '❌ Erreur lors du chargement de la configuration', 'error');
+    }
+}
+
+async function loadQbittorrentCategories() {
+    try {
+        const response = await fetch('/api/qbittorrent/categories_and_tags');
+        const data = await response.json();
+        
+        if (data.success && data.categories.length > 0) {
+            const select = document.getElementById('qbittorrentDefaultCategory');
+            const currentValue = select.value;
+            
+            // Ajouter les catégories
+            const optionsHtml = data.categories
+                .map(cat => `<option value="${cat}">${cat}</option>`)
+                .join('');
+            
+            select.innerHTML = `<option value="">-- Aucune catégorie --</option>` + optionsHtml;
+            select.value = currentValue;
+        }
+    } catch (error) {
+        console.warn('Erreur lors du chargement des catégories:', error);
+    }
+}
+
+async function saveQbittorrentSettings() {
+    const config = {
+        enabled: document.getElementById('qbittorrentEnabled').checked,
+        url: document.getElementById('qbittorrentUrl').value.trim(),
+        port: parseInt(document.getElementById('qbittorrentPort').value),
+        username: document.getElementById('qbittorrentUsername').value.trim(),
+        password: document.getElementById('qbittorrentPassword').value,
+        default_category: document.getElementById('qbittorrentDefaultCategory').value.trim()
+    };
+
+    try {
+        const response = await fetch('/api/qbittorrent/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('qbittorrentMessage', '✅ Configuration qBittorrent enregistrée !', 'success');
+        } else {
+            showMessage('qbittorrentMessage', '❌ Erreur: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('qbittorrentMessage', '❌ Erreur de connexion: ' + error.message, 'error');
+    }
+}
+
+async function testQbittorrentConnection() {
+    showMessage('qbittorrentMessage', '⏳ Test de connexion en cours...', 'info');
+    
+    // Préparer la configuration du formulaire
+    const config = {
+        enabled: true,  // Forcer enabled à true pour le test
+        url: document.getElementById('qbittorrentUrl').value.trim(),
+        port: parseInt(document.getElementById('qbittorrentPort').value),
+        username: document.getElementById('qbittorrentUsername').value.trim(),
+        password_decrypted: document.getElementById('qbittorrentPassword').value  // Texte clair du formulaire
+    };
+    
+    // Vérifier que l'URL est remplie
+    if (!config.url) {
+        showMessage('qbittorrentMessage', '❌ Veuillez entrer une URL', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/qbittorrent/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        const data = await response.json();
+        if (data.success) {
+            showMessage('qbittorrentMessage', '✅ ' + data.message, 'success');
+            // Charger les catégories disponibles après un test réussi
+            setTimeout(() => loadQbittorrentCategories(), 500);
+        } else {
+            showMessage('qbittorrentMessage', '❌ Échec: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('qbittorrentMessage', '❌ Erreur: ' + error.message, 'error');
+    }
+}
+
+function resetQbittorrentSettings() {
+    if (!confirm('Voulez-vous réinitialiser la configuration qBittorrent ?')) return;
+    document.getElementById('qbittorrentEnabled').checked = false;
+    document.getElementById('qbittorrentUrl').value = 'http://localhost';
+    document.getElementById('qbittorrentPort').value = '8080';
+    document.getElementById('qbittorrentUsername').value = '';
+    document.getElementById('qbittorrentPassword').value = '';
+    showMessage('qbittorrentMessage', '🔄 Configuration réinitialisée', 'info');
+}
+
+function toggleQbittorrentPassword() {
+    const passwordInput = document.getElementById('qbittorrentPassword');
+    const toggleButton = passwordInput.closest('.password-input-group').querySelector('.btn-toggle-password');
+    qbittorrentPasswordVisible = !qbittorrentPasswordVisible;
+    passwordInput.type = qbittorrentPasswordVisible ? 'text' : 'password';
+    toggleButton.textContent = qbittorrentPasswordVisible ? '🙈 Masquer' : '👁️ Afficher';
+}
+
 // ===== MESSAGES =====
 function showMessage(elementId, text, type) {
     try {
@@ -700,6 +835,12 @@ window.addEventListener('load', () => {
         loadProwlarrSettings();
     } catch (e) {
         console.error('Erreur loadProwlarrSettings:', e);
+    }
+    
+    try {
+        loadQbittorrentSettings();
+    } catch (e) {
+        console.error('Erreur loadQbittorrentSettings:', e);
     }
     
     try {

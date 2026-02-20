@@ -334,11 +334,16 @@ function displayProwlarrResults(results) {
                                 <div class="file-name" title="${result.title}">${result.title}</div>
                             </div>
                             ${result.size ? `<div class="file-size">${formatBytes(result.size)}</div>` : ''}
-                            ${result.download_url ? `
-                                <a href="${result.download_url}" target="_blank" class="add-button" style="text-decoration: none; background: #28a745;">
-                                    🔗 Ouvrir
-                                </a>
-                            ` : ''}
+                            <div style="display: flex; gap: 8px;">
+                                ${result.download_url ? `
+                                    <a href="${result.download_url}" target="_blank" class="add-button" style="text-decoration: none; background: #28a745;">
+                                        🔗 Ouvrir
+                                    </a>
+                                    <button class="add-button" style="background: #f5576c;" onclick="addTorrentToQbittorrent('${escapeForAttribute(result.download_url)}', this)">
+                                        ⚡ qBittorrent
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -514,11 +519,54 @@ function showMessage(text, type) {
     }, 5000);
 }
 
-// Ferme le modal si on clique en dehors
-window.onclick = function(event) {
-    const modal = document.getElementById('settingsModal');
-    if (event.target == modal) {
-        closeSettings();
+// Ajouter un torrent à qBittorrent avec la catégorie par défaut
+async function addTorrentToQbittorrent(torrentUrl, button) {
+    const originalText = button.textContent;
+    button.textContent = '⏳ Envoi...';
+    button.disabled = true;
+
+    try {
+        // Charger la config pour obtenir la catégorie par défaut
+        const configResponse = await fetch('/api/qbittorrent/config');
+        const config = await configResponse.json();
+        
+        const payload = {
+            torrent_url: torrentUrl
+        };
+        
+        // Ajouter la catégorie par défaut si elle est configurée
+        if (config.default_category) {
+            payload.category = config.default_category;
+        }
+        
+        const response = await fetch('/api/qbittorrent/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            button.textContent = '✓ Ajouté!';
+            button.style.background = '#10b981';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '';
+            }, 3000);
+        } else {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+    } catch (error) {
+        button.textContent = '✗ Erreur';
+        button.style.background = '#dc3545';
+        alert('Erreur: ' + error.message);
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+            button.style.background = '';
+        }, 3000);
     }
 }
 

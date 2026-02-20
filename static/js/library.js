@@ -229,6 +229,32 @@ async function scanLibrary() {
     }
 }
 
+async function scanSeries(seriesId) {
+    try {
+        const response = await fetch(`/api/scan/series/${seriesId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Scan de la série terminé !\n${data.volumes_count} volume(s) détecté(s).`);
+            // Recharger les détails de la série
+            const seriesData = await fetch(`/api/series/${seriesId}`);
+            if (seriesData.ok) {
+                closeModal();
+                // Recharger la page pour voir les changements
+                await loadLibraryData();
+            }
+        } else {
+            alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+        }
+    } catch (error) {
+        alert('❌ Erreur de connexion: ' + error.message);
+    }
+}
+
 async function enrichAllSeries() {
     if (!confirm('Enrichir toutes les séries sans infos Nautiljon?\n\nCette opération peut prendre du temps...')) {
         return;
@@ -335,6 +361,9 @@ async function viewSeries(seriesId) {
                             <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
                                 🔍 Chercher un autre titre
                             </button>
+                            <button class="btn" onclick="scanSeries(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
+                                🔄 Scanner cette série
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -349,6 +378,9 @@ async function viewSeries(seriesId) {
                         </button>
                         <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: #f59e0b;">
                             🔍 Chercher manuellement
+                        </button>
+                        <button class="btn" onclick="scanSeries(${seriesId})" style="background: #10b981;">
+                            🔄 Scanner cette série
                         </button>
                     </p>
                 </div>
@@ -548,22 +580,10 @@ async function searchMissingVolume(seriesTitle, volumeNumber) {
 function displaySearchResults(seriesTitle, volumeNumber, results) {
     const searchModalBody = document.getElementById('search-modal-body');
     
-    // Regrouper par thread
-    const grouped = {};
-    results.forEach(result => {
-        if (!grouped[result.thread_id]) {
-            grouped[result.thread_id] = {
-                title: result.thread_title,
-                url: result.thread_url,
-                category: result.forum_category,
-                cover_image: result.cover_image,
-                description: result.description,
-                links: []
-            };
-        }
-        grouped[result.thread_id].links.push(result);
-    });
-
+    // Séparer les résultats ED2K et Prowlarr
+    const ed2kResults = results.filter(r => r.source === 'ebdz');
+    const prowlarrResults = results.filter(r => r.source === 'prowlarr');
+    
     let html = `
         <div class="search-header">
             <h2>🔍 ${escapeHtml(seriesTitle)} - Volume ${volumeNumber}</h2>
@@ -571,51 +591,146 @@ function displaySearchResults(seriesTitle, volumeNumber, results) {
         </div>
     `;
 
-    for (const threadId in grouped) {
-        const thread = grouped[threadId];
-        
-        html += `
-            <div class="result-card" style="margin-top: 20px;">
-                <div class="cover-container">
-                    ${thread.cover_image ? 
-                        `<img src="/covers/${thread.cover_image.replace('covers/', '')}" class="cover-image" alt="Couverture">` 
-                        : '<div class="cover-image" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #999;">Pas de couverture</div>'
-                    }
-                </div>
-                <div class="result-content">
-                    <div class="result-title">${thread.title}</div>
-                    <span class="result-category">${thread.category || 'Non catégorisé'}</span>
-                    
-                    ${thread.description ? 
-                        `<div class="description">${thread.description}</div>` 
-                        : ''
-                    }
-                    
-                    <div class="file-info">
-        `;
-
-        thread.links.forEach((link, index) => {
-            const volumeDisplay = link.volume ? `<div class="volume-badge">Vol. ${link.volume}</div>` : '';
-            const decodedFilename = decodeFilename(link.filename);
-            
-            html += `
-                <div class="file-item">
-                    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                        ${volumeDisplay}
-                        <div class="file-name" title="${decodedFilename}">${decodedFilename}</div>
-                    </div>
-                    <div class="file-size">${formatBytes(link.filesize)}</div>
-                    <button class="copy-button" onclick="copyLink('${escapeForAttribute(link.link)}', this)">📋 Copier</button>
-                    <button class="add-button" onclick="addToEmule('${escapeForAttribute(link.link)}', this)" id="add-search-${threadId}-${index}">
-                        ⬇️ Ajouter
-                    </button>
-                </div>
-            `;
+    // ===== SECTION ED2K =====
+    if (ed2kResults.length > 0) {
+        // Regrouper par thread
+        const grouped = {};
+        ed2kResults.forEach(result => {
+            if (!grouped[result.thread_id]) {
+                grouped[result.thread_id] = {
+                    title: result.thread_title,
+                    url: result.thread_url,
+                    category: result.forum_category,
+                    cover_image: result.cover_image,
+                    description: result.description,
+                    links: []
+                };
+            }
+            grouped[result.thread_id].links.push(result);
         });
 
         html += `
+            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0;">📚 Résultats eMule (${ed2kResults.length})</h3>
+            </div>
+        `;
+
+        for (const threadId in grouped) {
+            const thread = grouped[threadId];
+            
+            html += `
+                <div class="result-card" style="margin-top: 20px;">
+                    <div class="cover-container">
+                        ${thread.cover_image ? 
+                            `<img src="/covers/${thread.cover_image.replace('covers/', '')}" class="cover-image" alt="Couverture">` 
+                            : '<div class="cover-image" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #999;">Pas de couverture</div>'
+                        }
+                    </div>
+                    <div class="result-content">
+                        <div class="result-title">${thread.title}</div>
+                        <span class="result-category">${thread.category || 'Non catégorisé'}</span>
+                        
+                        ${thread.description ? 
+                            `<div class="description">${thread.description}</div>` 
+                            : ''
+                        }
+                        
+                        <div class="file-info">
+            `;
+
+            thread.links.forEach((link, index) => {
+                const volumeDisplay = link.volume ? `<div class="volume-badge">Vol. ${link.volume}</div>` : '';
+                const decodedFilename = decodeFilename(link.filename);
+                
+                html += `
+                    <div class="file-item">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            ${volumeDisplay}
+                            <div class="file-name" title="${decodedFilename}">${decodedFilename}</div>
+                        </div>
+                        <div class="file-size">${formatBytes(link.filesize)}</div>
+                        <button class="copy-button" onclick="copyLink('${escapeForAttribute(link.link)}', this)">📋 Copier</button>
+                        <button class="add-button" onclick="addToEmule('${escapeForAttribute(link.link)}', this)" id="add-search-${threadId}-${index}">
+                            ⬇️ Ajouter
+                        </button>
+                    </div>
+                `;
+            });
+
+            html += `
+                        </div>
                     </div>
                 </div>
+            `;
+        }
+    }
+
+    // ===== SECTION PROWLARR =====
+    if (prowlarrResults.length > 0) {
+        html += `
+            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0;">🔍 Résultats Prowlarr (${prowlarrResults.length})</h3>
+            </div>
+        `;
+
+        prowlarrResults.forEach((result, index) => {
+            const publishDate = result.publish_date ? new Date(result.publish_date).toLocaleDateString('fr-FR') : 'N/A';
+            const seeders = result.seeders !== null ? result.seeders : 'N/A';
+            const peers = result.peers !== null ? result.peers : 'N/A';
+            
+            html += `
+                <div class="result-card" style="margin-top: 20px;">
+                    <div class="result-content" style="width: 100%;">
+                        <div class="result-title">${escapeHtml(result.title)}</div>
+                        <span class="result-category">${result.indexer || 'Prowlarr'}</span>
+                        
+                        <div style="margin-top: 10px; font-size: 0.9em;">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px;">
+                                <div>
+                                    <strong>Taille:</strong> ${formatBytes(result.size)}
+                                </div>
+                                <div>
+                                    <strong>Date:</strong> ${publishDate}
+                                </div>
+                                <div>
+                                    <strong>Seeders:</strong> ${seeders}
+                                </div>
+                                <div>
+                                    <strong>Peers:</strong> ${peers}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${result.description ? 
+                            `<div class="description">${escapeHtml(result.description)}</div>` 
+                            : ''
+                        }
+                        
+                        <div class="file-info" style="margin-top: 15px;">
+                            <div class="file-item">
+                                <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                    <div class="file-name">${escapeHtml(result.title)}</div>
+                                </div>
+                                <button class="copy-button" onclick="copyLink('${escapeForAttribute(result.link || result.download_url)}', this)">📋 Copier lien</button>
+                                ${result.download_url ? `
+                                    <button class="add-button" style="background: #f5576c;" onclick="addTorrentToQbittorrent('${escapeForAttribute(result.download_url)}', this)">
+                                        ⚡ qBittorrent
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // Si aucun résultat
+    if (results.length === 0) {
+        html += `
+            <div class="no-data">
+                <h3>😕 Aucun résultat</h3>
+                <p>Aucun lien trouvé pour ce volume dans ED2K ou Prowlarr</p>
             </div>
         `;
     }
@@ -860,6 +975,59 @@ async function removeTagFromSeries(seriesId, tag, event) {
         alert('Erreur lors de la suppression du tag');
     }
 }
+
+// ===== qBITTORRENT =====
+// Ajouter un torrent à qBittorrent avec la catégorie par défaut
+async function addTorrentToQbittorrent(torrentUrl, button) {
+    const originalText = button.textContent;
+    button.textContent = '⏳ Envoi...';
+    button.disabled = true;
+
+    try {
+        // Charger la config pour obtenir la catégorie par défaut
+        const configResponse = await fetch('/api/qbittorrent/config');
+        const config = await configResponse.json();
+        
+        const payload = {
+            torrent_url: torrentUrl
+        };
+        
+        // Ajouter la catégorie par défaut si elle est configurée
+        if (config.default_category) {
+            payload.category = config.default_category;
+        }
+        
+        const response = await fetch('/api/qbittorrent/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            button.textContent = '✓ Ajouté!';
+            button.style.background = '#10b981';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '';
+            }, 3000);
+        } else {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+    } catch (error) {
+        button.textContent = '✗ Erreur';
+        button.style.background = '#dc3545';
+        alert('Erreur: ' + error.message);
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+            button.style.background = '';
+        }, 3000);
+    }
+}
+
 window.onclick = function(event) {
     const modal = document.getElementById('series-modal');
     const searchModal = document.getElementById('search-ed2k-modal');

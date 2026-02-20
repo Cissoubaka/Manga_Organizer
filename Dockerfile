@@ -1,5 +1,5 @@
 # Utiliser une image Debian complète pour avoir accès à plus de paquets
-FROM debian:bookworm
+FROM debian:trixie
 
 # Configurer les sources APT pour inclure contrib et non-free
 RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \

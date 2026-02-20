@@ -31,6 +31,7 @@ def create_app(config_name='default'):
     from blueprints.prowlarr import prowlarr_bp
     from blueprints.nautiljon import nautiljon_bp
     from blueprints.settings import settings_bp
+    from blueprints.qbittorrent import qbittorrent_bp
     
     app.register_blueprint(library_bp)
     app.register_blueprint(search_bp)
@@ -38,6 +39,7 @@ def create_app(config_name='default'):
     app.register_blueprint(ebdz_bp, url_prefix='/api/ebdz')
     app.register_blueprint(prowlarr_bp, url_prefix='/api/prowlarr')
     app.register_blueprint(nautiljon_bp, url_prefix='/api/nautiljon')
+    app.register_blueprint(qbittorrent_bp)
     app.register_blueprint(settings_bp)
     
     return app

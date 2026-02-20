@@ -8,11 +8,16 @@ RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-fr
 
 # Installer Python et les dépendances système (avec retries en cas d'erreur réseau)
 RUN apt-get install -y --no-install-recommends \
-    python3.11 \
+    python3 \
     python3-pip \
+    python3-dev \
+    python3-lxml \
+    build-essential \
     p7zip-full \
     libxml2 \
+    libxml2-dev \
     libxslt1.1 \
+    libxslt1-dev \
     unrar-free \
     ca-certificates \
     curl \
@@ -29,8 +34,7 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 # Copier le code de l'application
 COPY . .
 
-# Copier le script d'entrypoint
-COPY docker-entrypoint.sh .
+# Rendre le script d'entrypoint exécutable
 RUN chmod +x docker-entrypoint.sh
 
 # Créer les répertoires nécessaires

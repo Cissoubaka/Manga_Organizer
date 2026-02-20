@@ -5,5 +5,4 @@ rarfile==4.1
 ebooklib==0.18
 requests==2.31.0
 beautifulsoup4==4.12.2
-lxml==4.9.3
 cryptography==41.0.4

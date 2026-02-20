@@ -376,7 +376,7 @@ def batch_enrich_series():
                     'error': str(e)
                 })
             
-            # Respecter les délais pour éviter de surcharger Nautiljon
+            # Pause pour éviter un bannissement IP
             time.sleep(5)
         
         conn.close()

@@ -8,7 +8,9 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 - 📥 Intégration aMule/eMule pour les téléchargements
 - 🎨 Interface web intuitive
 - 🔐 Chiffrement des données sensibles
-- 🐳 Support Docker complet (en cours)
+- 🐳 Support Docker
+- Support Prowlarr
+- Support qBittorrent
 
 ---
 
@@ -633,6 +635,6 @@ Ouvrez une issue GitHub avec :
 
 ---
 
-**Dernière mise à jour** : 16 février 2026
+**Dernière mise à jour** : 20 février 2026
 
 Fait avec ❤️ par Cissoubaka

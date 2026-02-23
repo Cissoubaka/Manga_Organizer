@@ -817,6 +817,111 @@ function showMessage(elementId, text, type) {
     }
 }
 
+// ===== EBDZ AUTO SCRAPE =====
+async function loadAutoScrapeConfig() {
+    try {
+        const response = await fetch('/api/ebdz/auto-scrape/config');
+        const config = await response.json();
+
+        document.getElementById('ebdzAutoScrapeEnabled').checked = config.auto_scrape_enabled;
+        document.getElementById('ebdzAutoScrapeInterval').value = config.auto_scrape_interval;
+        document.getElementById('ebdzAutoScrapeUnit').value = config.auto_scrape_interval_unit;
+
+        updateAutoScrapeUI();
+        checkAutoScrapeStatus();
+    } catch (error) {
+        console.error('Erreur lors du chargement de la config auto scrape:', error);
+    }
+}
+
+function updateAutoScrapeUI() {
+    const enabled = document.getElementById('ebdzAutoScrapeEnabled').checked;
+    const controlsDiv = document.getElementById('autoScrapeControlsDiv');
+    const statusDiv = document.getElementById('autoScrapeStatusDiv');
+
+    if (enabled) {
+        controlsDiv.style.display = 'flex';
+        statusDiv.style.display = 'block';
+    } else {
+        controlsDiv.style.display = 'none';
+        statusDiv.style.display = 'none';
+    }
+}
+
+async function saveAutoScrapeConfig() {
+    try {
+        const enabled = document.getElementById('ebdzAutoScrapeEnabled').checked;
+        const interval = parseInt(document.getElementById('ebdzAutoScrapeInterval').value);
+        const unit = document.getElementById('ebdzAutoScrapeUnit').value;
+
+        if (enabled && interval < 1) {
+            showMessage('ebdzAutoMessage', '⚠️ L\'intervalle doit être >= 1', 'warning');
+            return;
+        }
+
+        const response = await fetch('/api/ebdz/auto-scrape/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                auto_scrape_enabled: enabled,
+                auto_scrape_interval: interval,
+                auto_scrape_interval_unit: unit
+            })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showMessage('ebdzAutoMessage', 
+                enabled ? `✅ Scraping automatique activé: tous les ${interval} ${unit}` : '✅ Scraping automatique désactivé', 
+                'success');
+            updateAutoScrapeUI();
+            checkAutoScrapeStatus();
+        } else {
+            showMessage('ebdzAutoMessage', '❌ Erreur: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showMessage('ebdzAutoMessage', '❌ Erreur: ' + error.message, 'error');
+    }
+}
+
+async function checkAutoScrapeStatus() {
+    try {
+        const response = await fetch('/api/ebdz/auto-scrape/status');
+        const data = await response.json();
+
+        if (data.success) {
+            const statusText = document.getElementById('autoScrapeStatusText');
+            const nextRunText = document.getElementById('autoScrapeNextRunText');
+
+            if (data.is_running) {
+                statusText.textContent = '🟢 Actif';
+                statusText.style.color = '#4CAF50';
+                
+                if (data.next_run) {
+                    const nextRun = new Date(data.next_run);
+                    nextRunText.textContent = nextRun.toLocaleString('fr-FR');
+                } else {
+                    nextRunText.textContent = 'Calcul en cours...';
+                }
+            } else {
+                statusText.textContent = '🔴 Inactif';
+                statusText.style.color = '#f44336';
+                nextRunText.textContent = '-';
+            }
+        }
+    } catch (error) {
+        console.error('Erreur lors du vérification du statut:', error);
+    }
+}
+
+// Ajouter l'event listener pour le checkbox auto scrape
+document.addEventListener('DOMContentLoaded', function() {
+    const checkbox = document.getElementById('ebdzAutoScrapeEnabled');
+    if (checkbox) {
+        checkbox.addEventListener('change', updateAutoScrapeUI);
+    }
+});
+
 // ===== INIT =====
 window.addEventListener('load', () => {
     try {
@@ -829,6 +934,12 @@ window.addEventListener('load', () => {
         loadEbdzConfig();
     } catch (e) {
         console.error('Erreur loadEbdzConfig:', e);
+    }
+
+    try {
+        loadAutoScrapeConfig();
+    } catch (e) {
+        console.error('Erreur loadAutoScrapeConfig:', e);
     }
     
     try {

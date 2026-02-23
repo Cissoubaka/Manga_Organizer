@@ -10,14 +10,10 @@ RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-fr
 RUN apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
-    python3-dev \
     python3-lxml \
-    build-essential \
     p7zip-full \
     libxml2 \
-    libxml2-dev \
     libxslt1.1 \
-    libxslt1-dev \
     unrar-free \
     ca-certificates \
     curl \

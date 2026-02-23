@@ -6,3 +6,4 @@ ebooklib==0.18
 requests==2.31.0
 beautifulsoup4==4.12.2
 cryptography==41.0.4
+APScheduler==3.10.4

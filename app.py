@@ -42,6 +42,21 @@ def create_app(config_name='default'):
     app.register_blueprint(qbittorrent_bp)
     app.register_blueprint(settings_bp)
     
+    # Initialiser le scheduler EBDZ
+    from blueprints.ebdz.scheduler import ebdz_scheduler
+    ebdz_scheduler.init_app(app)
+    
+    # Démarrer le scheduler et charger la configuration automatique
+    with app.app_context():
+        from blueprints.ebdz.routes import load_ebdz_config
+        ebdz_config = load_ebdz_config()
+        
+        if ebdz_config.get('auto_scrape_enabled', False):
+            interval = ebdz_config.get('auto_scrape_interval', 60)
+            interval_unit = ebdz_config.get('auto_scrape_interval_unit', 'minutes')
+            ebdz_scheduler.add_job(interval, interval_unit)
+            print(f"✓ Scraping automatique EBDZ activé: tous les {interval} {interval_unit}")
+    
     return app
 
 

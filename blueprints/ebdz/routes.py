@@ -171,3 +171,76 @@ def scrape():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ebdz_bp.route('/auto-scrape/config', methods=['GET', 'POST'])
+def auto_scrape_config():
+    """Configuration du scraping automatique EBDZ"""
+    
+    if request.method == 'GET':
+        config = load_ebdz_config()
+        return jsonify({
+            'auto_scrape_enabled': config.get('auto_scrape_enabled', False),
+            'auto_scrape_interval': config.get('auto_scrape_interval', 60),
+            'auto_scrape_interval_unit': config.get('auto_scrape_interval_unit', 'minutes')
+        })
+    
+    else:  # POST
+        try:
+            data = request.get_json()
+            config = load_ebdz_config()
+            
+            # Mettre à jour la configuration
+            enabled = data.get('auto_scrape_enabled', False)
+            interval = int(data.get('auto_scrape_interval', 60))
+            interval_unit = data.get('auto_scrape_interval_unit', 'minutes')
+            
+            if interval < 1:
+                return jsonify({'success': False, 'error': 'L\'intervalle doit être >= 1'}), 400
+            
+            if interval_unit not in ['minutes', 'hours', 'days']:
+                return jsonify({'success': False, 'error': 'Unité de temps invalide'}), 400
+            
+            config['auto_scrape_enabled'] = enabled
+            config['auto_scrape_interval'] = interval
+            config['auto_scrape_interval_unit'] = interval_unit
+            
+            if save_ebdz_config(config):
+                # Gérer le scheduler
+                if enabled:
+                    from .scheduler import ebdz_scheduler
+                    ebdz_scheduler.add_job(interval, interval_unit)
+                else:
+                    from .scheduler import ebdz_scheduler
+                    ebdz_scheduler.remove_job()
+                
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Erreur de sauvegarde'}), 500
+        
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ebdz_bp.route('/auto-scrape/status', methods=['GET'])
+def auto_scrape_status():
+    """Récupérer le statut du scraping automatique"""
+    try:
+        from .scheduler import ebdz_scheduler
+        
+        is_running = False
+        next_run = None
+        
+        if ebdz_scheduler.scheduler and ebdz_scheduler.scheduler.running:
+            is_running = True
+            job = ebdz_scheduler.scheduler.get_job(ebdz_scheduler.job_id)
+            if job:
+                next_run = job.next_run_time.isoformat() if job.next_run_time else None
+        
+        return jsonify({
+            'success': True,
+            'is_running': is_running,
+            'next_run': next_run
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

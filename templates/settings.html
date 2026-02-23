@@ -243,6 +243,59 @@
                             <div id="ebdzMessage2" class="message"></div>
                         </div>
 
+                        <!-- Carte scraping automatique -->
+                        <div class="settings-card" style="margin-top: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <span style="font-size: 24px;">⏰</span>
+                                <h3 style="color: white; margin: 0;">Scraping automatique</h3>
+                            </div>
+
+                            <div class="form-group checkbox-group" style="margin-bottom: 20px;">
+                                <input type="checkbox" id="ebdzAutoScrapeEnabled">
+                                <label for="ebdzAutoScrapeEnabled" style="color: white;">
+                                    <strong>Activer le scraping automatique</strong>
+                                    <span class="help-text" style="color: rgba(255,255,255,0.85);">Le forum sera scrapy automatiquement à intervalle régulier</span>
+                                </label>
+                            </div>
+
+                            <div class="form-row" id="autoScrapeControlsDiv" style="display: none;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="ebdzAutoScrapeInterval" style="color: white;">Intervalle</label>
+                                    <input type="number" id="ebdzAutoScrapeInterval" value="60" min="1" placeholder="60" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); color: white;">
+                                    <small class="help-text" style="color: rgba(255,255,255,0.85);">Temps avant le prochain scraping</small>
+                                </div>
+
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="ebdzAutoScrapeUnit" style="color: white;">Unité</label>
+                                    <select id="ebdzAutoScrapeUnit" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); color: white;">
+                                        <option value="minutes" style="background: #333; color: white;">Minutes</option>
+                                        <option value="hours" style="background: #333; color: white;">Heures</option>
+                                        <option value="days" style="background: #333; color: white;">Jours</option>
+                                    </select>
+                                    <small class="help-text" style="color: rgba(255,255,255,0.85);">Unité de temps de l'intervalle</small>
+                                </div>
+                            </div>
+
+                            <div id="autoScrapeStatusDiv" style="display: none; margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 5px; border-left: 3px solid #4CAF50;">
+                                <p style="margin: 0 0 5px 0; color: white;">
+                                    <strong>Statut:</strong> <span id="autoScrapeStatusText">En attente...</span>
+                                </p>
+                                <p style="margin: 0; color: rgba(255,255,255,0.9);">
+                                    <strong>Prochain scraping:</strong> <span id="autoScrapeNextRunText">-</span>
+                                </p>
+                            </div>
+
+                            <div class="form-actions" style="margin-top: 20px;">
+                                <button class="btn" onclick="saveAutoScrapeConfig()" style="background: white; color: #667eea; border: none;">
+                                    💾 Enregistrer la config automatique
+                                </button>
+                                <button class="btn" onclick="checkAutoScrapeStatus()" id="btnCheckAutoStatus" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
+                                    🔄 Vérifier le statut
+                                </button>
+                            </div>
+                            <div id="ebdzAutoMessage" class="message"></div>
+                        </div>
+
                         <!-- Aide -->
                         <div class="help-section">
                             <h3>📖 Aide</h3>

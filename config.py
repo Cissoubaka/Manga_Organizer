@@ -40,7 +40,10 @@ class Config:
     EBDZ_CONFIG = {
         'username': '',
         'password': '',
-        'forums': []
+        'forums': [],
+        'auto_scrape_enabled': False,
+        'auto_scrape_interval': 60,  # en minutes
+        'auto_scrape_interval_unit': 'minutes'  # 'minutes', 'hours', 'days'
     }
     
     # Prowlarr par défaut

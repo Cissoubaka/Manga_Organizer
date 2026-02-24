@@ -299,6 +299,27 @@ function displayProwlarrResults(results) {
             seedersInfo += (seedersInfo ? ' | ' : '') + `👥 ${result.peers}`;
         }
         
+        // Badge tracker avec lien
+        let trackerBadge = '';
+        if (result.tracker) {
+            if (result.info_url) {
+                trackerBadge = `
+                    <a href="${result.info_url}" target="_blank" title="Voir sur ${result.tracker}" 
+                       style="text-decoration: none; display: inline-block;">
+                        <span style="background: #ff9800; color: white; padding: 4px 12px; border-radius: 5px; font-size: 0.9em; font-weight: 600;">
+                            🔗 ${result.tracker}
+                        </span>
+                    </a>
+                `;
+            } else {
+                trackerBadge = `
+                    <span style="background: #ff9800; color: white; padding: 4px 12px; border-radius: 5px; font-size: 0.9em; font-weight: 600;">
+                        🔗 ${result.tracker}
+                    </span>
+                `;
+            }
+        }
+        
         html += `
             <div class="result-card">
                 <div class="result-content">
@@ -309,6 +330,7 @@ function displayProwlarrResults(results) {
                                 <span class="result-indexer" style="background: #42a5f5; color: white; padding: 4px 12px; border-radius: 5px; font-size: 0.9em; font-weight: 600;">
                                     🔍 ${result.indexer || 'Prowlarr'}
                                 </span>
+                                ${trackerBadge}
                                 ${publishDate ? `
                                     <span style="color: #999; font-size: 0.9em;">
                                         📅 ${publishDate}
@@ -337,11 +359,16 @@ function displayProwlarrResults(results) {
                             <div style="display: flex; gap: 8px;">
                                 ${result.download_url ? `
                                     <a href="${result.download_url}" target="_blank" class="add-button" style="text-decoration: none; background: #28a745;">
-                                        🔗 Ouvrir
+                                        � Télécharger torrent
                                     </a>
                                     <button class="add-button" style="background: #f5576c;" onclick="addTorrentToQbittorrent('${escapeForAttribute(result.download_url)}', this)">
                                         ⚡ qBittorrent
                                     </button>
+                                ` : ''}
+                                ${result.info_url && result.info_url !== result.download_url ? `
+                                    <a href="${result.info_url}" target="_blank" class="add-button" style="text-decoration: none; background: #17a2b8;">
+                                        🌐 Page source
+                                    </a>
                                 ` : ''}
                             </div>
                         </div>

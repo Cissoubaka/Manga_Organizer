@@ -249,9 +249,24 @@ def search_prowlarr():
             
             # Ne garder que les résultats avec un score minimal
             if score > 0:
+                # Extraire le tracker/source depuis infoUrl
+                info_url = item.get('infoUrl', '')
+                tracker_name = ''
+                
+                # Essayer d'extraire le nom du domaine depuis infoUrl
+                if info_url:
+                    from urllib.parse import urlparse
+                    try:
+                        parsed = urlparse(info_url)
+                        tracker_name = parsed.netloc or parsed.path
+                        # Nettoyer le tracker name
+                        tracker_name = tracker_name.split('?')[0].split('#')[0]
+                    except:
+                        tracker_name = info_url[:50]  # Fallback si erreur parsing
+                
                 results.append({
                     'title': item.get('title', 'Sans titre'),
-                    'indexer': 'Prowlarr',  # L'API ne fournit pas l'info de l'indexeur d'origine
+                    'indexer': item.get('indexer', 'Prowlarr'),  # Récupérer l'indexer d'origine
                     'link': item.get('link', ''),
                     'guid': item.get('guid', ''),
                     'download_url': item.get('downloadUrl', ''),
@@ -260,6 +275,8 @@ def search_prowlarr():
                     'peers': item.get('peers', 0),
                     'publish_date': item.get('publishDate', ''),
                     'description': item.get('description', ''),
+                    'tracker': tracker_name,  # Nom du tracker extrait
+                    'info_url': info_url,  # URL source clickable
                     'score': score
                 })
         

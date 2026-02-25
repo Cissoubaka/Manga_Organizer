@@ -11,6 +11,9 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 - 🐳 Support Docker
 - Support Prowlarr
 - Support qBittorrent
+- ajout de nouvelle série
+- recherche globale de série sur l'index
+- monitoring des volumes manquants/nouveaux en WIP (Ne pas activer)
 
 ---
 
@@ -311,7 +314,7 @@ docker-compose up -d --build --no-cache
 
 - `./data:/app/data` → Données persistantes (bases, config)
 - `./data/covers:/app/data/covers` → Couvertures
-- `/media/media2/KOMGA/:/library` → Bibliothèques (adapter le chemin)
+- `/media/biblio/:/library` → Bibliothèques (adapter le chemin)
 
 > ⚠️ **Important pour les chemins avec espaces en Docker**
 > 
@@ -364,8 +367,8 @@ docker-compose up -d --build --no-cache
 
 ```
 Mangas/
-├── "Manga Title Vol 02.zip"
-├── "Manga Title Vol 03.rar"
+├── "Manga Title Vol 01.zip"
+├── "Manga Title Vol 02.rar"
 └── ...
 ```
 
@@ -463,23 +466,6 @@ FLASK_ENV=development FLASK_DEBUG=1 python app.py
 # Application accessible à http://localhost:5000
 ```
 
----
-
-## 📄 Fichiers importants
-
-| Fichier | Description |
-|---------|-------------|
-| `app.py` | Application Flask principale |
-| `config.py` | Configuration centralisée |
-| `encryption.py` | Gestion chiffrement AES |
-| `requirements.txt` | Dépendances Python |
-| `Dockerfile` | Image Docker |
-| `docker-compose.yml` | Orchestration services |
-| `.env.example` | Template variables d'env |
-| `DOCKER.md` | Guide Docker détaillé |
-
----
-
 ## 🤝 Contribution
 
 Les contributions sont bienvenues ! Pour contribuer :
@@ -506,36 +492,6 @@ Manga Organizer now includes direct integration with **Nautiljon.com**, the refe
 ⚡ **Batch Operations** - Enrich multiple series at once
 📌 **Persistent Storage** - All Nautiljon data is saved to your database
 
-### Quick Start
-
-#### Option 1: Auto-Enrich During Scan
-
-```bash
-# Scan library and automatically enrich with Nautiljon data
-POST /api/scan/1 with body: {"auto_enrich": true}
-```
-
-#### Option 2: Manual Enrichment
-
-```bash
-# Enrich a specific series
-POST /api/nautiljon/enrich/1
-{
-  "search_by": "title",
-  "value": "One Piece"
-}
-```
-
-#### Option 3: Batch Enrichment
-
-```bash
-# Enrich multiple series at once
-POST /api/nautiljon/batch-enrich
-{
-  "series_ids": [1, 2, 3, 4, 5]
-}
-```
-
 ### Data Retrieved
 
 - 📈 **Total Volumes** - Worldwide volume count
@@ -545,51 +501,43 @@ POST /api/nautiljon/batch-enrich
 - 🔄 **Status** - En cours, Terminé, Pausé
 - 📅 **Years** - Publication start and end years
 
-### API Endpoints
 
-See [NAUTILJON.md](NAUTILJON.md) for complete API documentation.
-
-```
-GET  /api/nautiljon/search?q=manga_title      - Search for manga
-GET  /api/nautiljon/info?title=...or url=...  - Get manga details
-POST /api/nautiljon/enrich/<series_id>        - Enrich a series
-POST /api/nautiljon/batch-enrich              - Batch enrich series
-GET  /api/series/<series_id>                  - Get series with Nautiljon data
-```
-
-### Frontend Integration
-
-Include the Nautiljon JavaScript library in your templates:
-
-```html
-<script src="/static/js/nautiljon.js"></script>
-<link rel="stylesheet" href="/static/css/style-nautiljon.css">
-```
-
-Example usage:
-
-```javascript
-// Search for manga
-const results = await NautiljonAPI.searchManga("One Piece");
-
-// Get manga details
-const info = await NautiljonAPI.getMangaInfo("One Piece");
-
-// Enrich a series
-const result = await NautiljonAPI.enrichSeries(1, "One Piece", "title");
-
-// Display info card
-NautiljonAPI.displayInfoCard(info, document.getElementById('info-container'));
-
-// Batch enrich with progress
-await NautiljonAPI.showEnrichmentProgress([1, 2, 3, 4, 5]);
-```
-
----
 
 ## 📄 Licence
 
-Ce projet est sous licence [À définir].
+Ce projet est sous licence GPL v3.
+
+---
+
+## 🔄 Changements récents
+
+### v0.0.9 (25 février 2026)
+
+#### ✨ Corrections de bugs
+- 🐛 **Monitoring des volumes manquants** : Correction du filtre de sélection des bibliothèques
+  - Les séries n'affichaient pas les données correctes lors de la sélection/désélection de bibliothèques
+  - Cause : Double appel de la fonction de toggle due au onclick et onchange
+  - Solution : Restructuration avec une balise `<label>` appropriée pour éviter les appels dupliqués
+
+#### ⚠️ Fonctionnalité en cours de développement (WIP)
+
+> **🚨 ATTENTION : Surveillance des Volumes Manquants en WIP**
+> 
+> La fonctionnalité de surveillance automatique des volumes manquants (Missing Monitor) est actuellement **en développement** et **ne doit pas être activée** en production.
+>
+> **État actuel** :
+> - ✅ Interface disponible (onglet Monitoring)
+> - ✅ Sélection des bibliothèques / séries
+> - ⚠️ Le reste des fonctionnalités est incomplet
+>
+> **À ne pas faire** :
+> - ❌ Ne PAS cocher "Activer la surveillance" dans la configuration
+> - ❌ Ne PAS utiliser la vérification automatique
+> - ❌ Ne PAS configurer le téléchargement automatique
+>
+> **Quand sera-ce prêt** : À confirmer
+>
+> Pour signaler un problème ou demander la finalisation, ouvrez une issue GitHub.
 
 ---
 
@@ -597,10 +545,9 @@ Ce projet est sous licence [À définir].
 
 ### Problèmes connus
 
-- ❌ EBDZ : captcha CLOUDFLARE bloque parfois le scraping
 - ❌ Unicode : certains noms de mangas avec caractères spéciaux
-- ⚠️ Performance : scanner 10k+ fichiers peut être lent (utiliser import par lot)
 - ⚠️ Nautiljon : les mangas très récents peuvent ne pas être trouvés
+- 🚨 **Monitoring des volumes** : Fonctionnalité en WIP, ne pas utiliser en production
 
 ### Signaler un bug
 
@@ -635,6 +582,6 @@ Ouvrez une issue GitHub avec :
 
 ---
 
-**Dernière mise à jour** : 20 février 2026
+**Dernière mise à jour** : 25 février 2026
 
 Fait avec ❤️ par Cissoubaka

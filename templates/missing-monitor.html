@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surveillance des Volumes Manquants - Manga Organizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-missing-monitor.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>📚 Surveillance des Volumes Manquants</h1>
+                    <p class="subtitle">Gérez la surveillance automatique des volumes manquants de vos séries</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="overview">
+                    <span class="emoji">📊</span> Aperçu
+                </button>
+                <button class="tab-button" data-tab="series">
+                    <span class="emoji">📖</span> Séries en Surveillance
+                </button>
+                <button class="tab-button" data-tab="search">
+                    <span class="emoji">🔍</span> Recherche Manuelle
+                </button>
+                <button class="tab-button" data-tab="history">
+                    <span class="emoji">📜</span> Historique
+                </button>
+                <button class="tab-button" data-tab="config">
+                    <span class="emoji">⚙️</span> Configuration
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tabs-content">
+                <!-- Overview Tab -->
+                <div class="tab-pane active" id="overview">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📚</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Séries en Surveillance</div>
+                                <div class="stat-value" id="monitored-count">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Volumes Manquants</div>
+                                <div class="stat-value" id="missing-count">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <div class="stat-label">Téléchargements</div>
+                                <div class="stat-value" id="download-count">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <button class="btn btn-primary" onclick="runManualCheck()">
+                            <span class="emoji">▶️</span> Vérifier Maintenant
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshStats()">
+                            <span class="emoji">🔄</span> Rafraîchir
+                        </button>
+                    </div>
+
+                    <!-- Recent Downloads -->
+                    <div class="section">
+                        <h2><span class="emoji">📥</span> Derniers Téléchargements</h2>
+                        <div class="downloads-list" id="recent-downloads">
+                            <p class="no-data">Chargement...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Series Tab -->
+                <div class="tab-pane" id="series">
+                    <!-- Bibliothèques Section -->
+                    <div class="section">
+                        <h2><span class="emoji">📚</span> Sélectionner les Bibliothèques</h2>
+                        <div class="libraries-selection" id="libraries-selection">
+                            <p class="no-data">Chargement des bibliothèques...</p>
+                        </div>
+                    </div>
+
+                    <!-- Séries Section -->
+                    <div class="section">
+                        <h2><span class="emoji">📖</span> Séries en Surveillance</h2>
+                        <div class="filter-group">
+                            <input type="text" id="series-search" placeholder="🔍 Rechercher une série..." class="search-input">
+                            <select id="series-status-filter" class="filter-select">
+                                <option value="all">Tous les statuts</option>
+                                <option value="missing">Volumes manquants</option>
+                                <option value="incomplete">À compléter</option>
+                            </select>
+                        </div>
+
+                        <div class="series-grid" id="series-grid">
+                            <p class="no-data">Sélectionnez une bibliothèque pour voir ses séries</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Tab -->
+                <div class="tab-pane" id="search">
+                    <div class="search-form">
+                        <div class="form-group">
+                            <label>📖 Titre du Manga</label>
+                            <input type="text" id="search-title" placeholder="Ex: One Piece" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>📚 Numéro de Volume</label>
+                            <input type="number" id="search-volume" placeholder="Ex: 1" min="1" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>🔗 Sources</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" name="search-source" value="ebdz" checked> EBDZ
+                                </label>
+                                <label>
+                                    <input type="checkbox" name="search-source" value="prowlarr" checked> Prowlarr
+                                </label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="searchVolume()">
+                            <span class="emoji">🔍</span> Rechercher
+                        </button>
+                    </div>
+
+                    <!-- Search Results -->
+                    <div class="section" id="search-results-section" style="display: none;">
+                        <h2><span class="emoji">📋</span> Résultats de Recherche</h2>
+                        <div class="results-list" id="search-results">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div class="tab-pane" id="history">
+                    <div class="filter-group">
+                        <select id="history-filter" class="filter-select">
+                            <option value="all">Tous les événements</option>
+                            <option value="success">✅ Succès</option>
+                            <option value="error">❌ Erreurs</option>
+                        </select>
+                    </div>
+
+                    <div class="history-list" id="history-list">
+                        <p class="no-data">Chargement...</p>
+                    </div>
+                </div>
+
+                <!-- Configuration Tab -->
+                <div class="tab-pane" id="config">
+                    <div class="config-section">
+                        <h2><span class="emoji">🔧</span> Configuration Générale</h2>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="config-enabled" onchange="saveConfig()">
+                                <span class="emoji">✅</span> Activer la surveillance
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="config-auto-check" onchange="updateAutoCheckUI()">
+                                <span class="emoji">🔄</span> Vérification automatique
+                            </label>
+                        </div>
+
+                        <div id="auto-check-settings" style="display: none; padding-left: 20px;">
+                            <div class="form-group">
+                                <label>Intervalle</label>
+                                <div class="input-group">
+                                    <input type="number" id="config-interval" min="1" value="60" class="form-control" style="max-width: 150px;">
+                                    <select id="config-interval-unit" class="form-control">
+                                        <option value="minutes">Minutes</option>
+                                        <option value="hours">Heures</option>
+                                        <option value="days">Jours</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="config-search" checked onchange="saveConfig()">
+                                <span class="emoji">🔍</span> Recherche automatique
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label>🔗 Sources de Recherche</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" name="source" value="ebdz" checked onchange="saveConfig()"> EBDZ
+                                </label>
+                                <label>
+                                    <input type="checkbox" name="source" value="prowlarr" checked onchange="saveConfig()"> Prowlarr
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="config-auto-download" onchange="saveConfig()">
+                                <span class="emoji">📥</span> Téléchargement automatique
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Client Préféré</label>
+                            <select id="config-client" class="form-control" onchange="saveConfig()">
+                                <option value="qbittorrent">qBittorrent</option>
+                                <option value="amule">aMule</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="saveConfig()">
+                            <span class="emoji">💾</span> Sauvegarder Configuration
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal pour détails téléchargement -->
+    <div class="modal" id="download-modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDownloadModal()">&times;</span>
+            <h2>Envoyer Téléchargement</h2>
+            <div class="form-group">
+                <label>Lien Torrent/Magnet</label>
+                <textarea id="modal-link" class="form-control" rows="3" placeholder="Coller le lien..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Titre</label>
+                <input type="text" id="modal-title" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>Volume</label>
+                <input type="number" id="modal-volume" class="form-control" readonly>
+            </div>
+            <button class="btn btn-primary" onclick="confirmDownload()">
+                📥 Envoyer
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/missing-monitor.js') }}"></script>
+</body>
+</html>

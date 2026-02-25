@@ -187,7 +187,7 @@
                     </div>
                     <div class="form-group">
                         <label for="series-select">Série à enrichir:</label>
-                        <select id="series-select" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                        <select id="series-select" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" onchange="onSeriesSelectChange()">
                             <option value="">Sélectionnez d'abord une bibliothèque</option>
                         </select>
                     </div>
@@ -356,6 +356,8 @@
                         setTimeout(() => {
                             const serieSelect = document.getElementById('series-select');
                             serieSelect.value = initialSeriesId;
+                            // Pré-remplir le titre personnalisé
+                            onSeriesSelectChange();
                         }, 100);
                     }
                 } else if (libraries.length > 0) {
@@ -577,6 +579,25 @@
         
         function onLibrarySelectChange() {
             loadSeriesSelect();
+            // Réinitialiser le titre personnalisé
+            document.getElementById('custom-search-title').value = '';
+        }
+
+        function onSeriesSelectChange() {
+            // Pré-remplir le titre personnalisé avec le titre de la série sélectionnée
+            const seriesSelect = document.getElementById('series-select');
+            const customTitleInput = document.getElementById('custom-search-title');
+            const selectedOption = seriesSelect.options[seriesSelect.selectedIndex];
+            
+            if (selectedOption.value) {
+                customTitleInput.value = selectedOption.text;
+            } else {
+                customTitleInput.value = '';
+            }
+            
+            // Réinitialiser les résultats précédents
+            document.getElementById('search-results').style.display = 'none';
+            document.getElementById('enrich-result').innerHTML = '';
         }
         
         function onBatchLibrarySelectChange() {

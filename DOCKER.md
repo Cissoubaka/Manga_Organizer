@@ -209,7 +209,7 @@ Si vous obtenez cette erreur quand vous ajoutez une bibliothèque avec des espac
 Le volume dans `docker-compose.yml` :
 ```yaml
 volumes:
-  - /media/media2/KOMGA/:/library   # ← Les dossiers de /media/media2/KOMGA/ sont accessibles via /library
+  - /media/biblio/:/library   # ← Les dossiers de /media/biblio/ sont accessibles via /library
 ```
 
 **2. Vérifiez les permissions**
@@ -217,7 +217,7 @@ volumes:
 Le dossier doit être lisible par Docker :
 ```bash
 # Sur la machine hôte
-ls -la /media/media2/KOMGA/
+ls -la /media/biblio/
 # Doit afficher vos dossiers, ex: "Ma Collection", "Mangas", etc.
 ```
 

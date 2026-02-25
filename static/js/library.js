@@ -70,9 +70,12 @@ function displaySeries(series) {
             ` : ''}
             <div class="series-info">📖 ${s.total_volumes} volume(s) local</div>
             <div class="series-info">📅 Dernier scan: ${new Date(s.last_scanned).toLocaleDateString('fr-FR')}</div>
-            ${s.missing_volumes.length > 0 ? 
-                `<div class="missing-volumes">⚠️ Volumes manquants: ${s.missing_volumes.join(', ')}</div>` :
-                `<div class="complete">✅ Collection complète</div>`
+            ${s.is_oneshot ? 
+                `<div class="complete">⭕ One-shot</div>` :
+                (s.missing_volumes.length > 0 ? 
+                    `<div class="missing-volumes">⚠️ Volumes manquants: ${s.missing_volumes.join(', ')}</div>` :
+                    `<div class="complete">✅ Collection complète</div>`
+                )
             }
         </div>
     `;
@@ -244,9 +247,38 @@ async function scanSeries(seriesId) {
             const seriesData = await fetch(`/api/series/${seriesId}`);
             if (seriesData.ok) {
                 closeModal();
-                // Recharger la page pour voir les changements
-                await loadLibraryData();
+                // Recharger la page pour voir les changements (si on est dans library.html)
+                if (typeof loadLibraryData === 'function') {
+                    await loadLibraryData();
+                }
             }
+        } else {
+            alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+        }
+    } catch (error) {
+        alert('❌ Erreur de connexion: ' + error.message);
+    }
+}
+
+async function toggleOneshot(seriesId) {
+    try {
+        const response = await fetch(`/api/series/${seriesId}/toggle-oneshot`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Recharger le modal pour afficher le nouvel état
+            viewSeries(seriesId);
+            
+            // Recharger aussi la liste pour mettre à jour les badges (si on est dans library.html)
+            setTimeout(() => {
+                if (typeof loadLibraryData === 'function') {
+                    loadLibraryData();
+                }
+            }, 500);
         } else {
             alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
         }
@@ -364,7 +396,7 @@ async function viewSeries(seriesId) {
                             <a href="${data.nautiljon.url}" target="_blank" class="btn" style="background: white; color: #667eea; white-space: nowrap;">
                                 ↗️ Nautiljon
                             </a>
-                            <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
+                            <button class="btn" onclick="searchNautiljonManually(${seriesId}, ${data.library.id})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
                                 🔍 Chercher un autre titre
                             </button>
                             <button class="btn" onclick="scanSeries(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
@@ -372,6 +404,9 @@ async function viewSeries(seriesId) {
                             </button>
                             <button class="btn" onclick="openRenameModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')\" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
                                 ✏️ Renommer fichiers
+                            </button>
+                            <button class="btn" id="oneshot-btn-${seriesId}" onclick="toggleOneshot(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
+                                ${data.is_oneshot ? '✅ One-shot (pas de volumes)' : '⭕ Marquer comme one-shot'}
                             </button>
                         </div>
                     </div>
@@ -382,10 +417,10 @@ async function viewSeries(seriesId) {
                 <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
                     <p style="margin: 0;">
                         ⚠️ Pas d'informations Nautiljon
-                        <button class="btn" onclick="enrichSeriesFromModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')">
+                        <button class="btn" onclick="enrichSeriesFromModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}', event)">
                             ✨ Enrichir
                         </button>
-                        <button class="btn" onclick="searchNautiljonManually(${seriesId})" style="background: #f59e0b;">
+                        <button class="btn" onclick="searchNautiljonManually(${seriesId}, ${data.library.id})" style="background: #f59e0b;">
                             🔍 Chercher manuellement
                         </button>
                         <button class="btn" onclick="scanSeries(${seriesId})" style="background: #10b981;">
@@ -393,6 +428,9 @@ async function viewSeries(seriesId) {
                         </button>
                         <button class="btn" onclick="openRenameModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')" style="background: #8b5cf6;">
                             ✏️ Renommer fichiers
+                        </button>
+                        <button class="btn" id="oneshot-btn-${seriesId}" onclick="toggleOneshot(${seriesId})" style="background: ${data.is_oneshot ? '#06b6d4' : '#a78bfa'};">
+                            ${data.is_oneshot ? '✅ One-shot (pas de volumes)' : '⭕ Marquer comme one-shot'}
                         </button>
                     </p>
                 </div>
@@ -404,41 +442,46 @@ async function viewSeries(seriesId) {
         if (data.has_parts && data.parts) {
             const partNumbers = Object.keys(data.parts).sort((a, b) => parseInt(a) - parseInt(b));
             
-            volumesHtml = partNumbers.map(partNum => {
-                const part = data.parts[partNum];
-                return `
-                    <div class="part-section">
-                        <div class="part-header">
-                            <h3>📖 ${escapeHtml(part.name)}</h3>
-                            <span class="part-count">${part.volumes.length} volume(s)</span>
-                        </div>
-                        <div class="volume-list">
-                            ${part.volumes.map(v => `
-                                <div class="volume-item">
-                                    <div class="volume-number">${v.volume_number || '?'}</div>
-                                    <div class="volume-details">
-                                        <div class="volume-filename">${escapeHtml(v.filename)}</div>
-                                        <div class="volume-meta">
-                                            ${v.author ? `<span class="badge">👤 ${escapeHtml(v.author)}</span>` : ''}
-                                            ${v.year ? `<span class="badge">📅 ${v.year}</span>` : ''}
-                                            ${v.resolution ? `<span class="badge">🖼️ ${v.resolution}</span>` : ''}
-                                            <span class="badge">📄 ${v.page_count} pages</span>
-                                            <span class="badge">💾 ${formatBytes(v.file_size)}</span>
-                                            <span class="badge">.${v.format.toUpperCase()}</span>
+            if (partNumbers.length > 0) {
+                volumesHtml = partNumbers.map(partNum => {
+                    const part = data.parts[partNum];
+                    return `
+                        <div class="part-section">
+                            <div class="part-header">
+                                <h3>📖 ${escapeHtml(part.name)}</h3>
+                                <span class="part-count">${part.volumes.length} volume(s)</span>
+                            </div>
+                            <div class="volume-list">
+                                ${part.volumes.map(v => `
+                                    <div class="volume-item">
+                                        <div class="volume-number">${data.is_oneshot ? 'OS' : (v.volume_number || '?')}</div>
+                                        <div class="volume-details">
+                                            <div class="volume-filename">${escapeHtml(v.filename)}</div>
+                                            <div class="volume-meta">
+                                                ${v.author ? `<span class="badge">👤 ${escapeHtml(v.author)}</span>` : ''}
+                                                ${v.year ? `<span class="badge">📅 ${v.year}</span>` : ''}
+                                                ${v.resolution ? `<span class="badge">🖼️ ${v.resolution}</span>` : ''}
+                                                <span class="badge">📄 ${v.page_count} pages</span>
+                                                <span class="badge">💾 ${formatBytes(v.file_size)}</span>
+                                                <span class="badge">.${v.format.toUpperCase()}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            `).join('')}
+                                `).join('')}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
-        } else {
+                    `;
+                }).join('');
+            }
+        }
+        
+        // Si pas de parties ou pas de volumes, afficher la liste simple
+        if (!volumesHtml) {
             volumesHtml = `
                 <div class="volume-list">
                     ${(data.volumes || []).map(v => `
                         <div class="volume-item">
-                            <div class="volume-number">${v.volume_number || '?'}</div>
+                            <div class="volume-number">${data.is_oneshot ? 'OS' : (v.volume_number || '?')}</div>
                             <div class="volume-details">
                                 <div class="volume-filename">${escapeHtml(v.filename)}</div>
                                 <div class="volume-meta">
@@ -461,7 +504,7 @@ async function viewSeries(seriesId) {
             <div class="modal-header">
                 <h2 class="modal-title">${escapeHtml(data.title)}</h2>
                 <p class="modal-subtitle">
-                    ${data.total_volumes} volume(s) dans la collection
+                    ${data.total_volumes} volume(s) dans la collection${data.is_oneshot ? ' 🔸 One-shot' : ''}
                     ${data.has_parts ? ' • Série avec arcs/parties' : ''}
                 </p>
                 <!-- Tags Management Section -->
@@ -475,7 +518,7 @@ async function viewSeries(seriesId) {
                         <button onclick="addTagToSeries(${seriesId})" class="btn" style="padding: 6px 12px; font-size: 0.9em;">Ajouter</button>
                     </div>
                 </div>
-                ${data.missing_volumes.length > 0 ? 
+                ${!data.is_oneshot && data.missing_volumes.length > 0 ? 
                     `<div class="missing-volumes-section" style="margin-top: 20px;">
                         <h3 class="missing-volumes-title">⚠️ Volumes manquants</h3>
                         <div class="missing-volumes-grid">
@@ -489,7 +532,7 @@ async function viewSeries(seriesId) {
                         </div>
                     </div>` : 
                     `<div class="complete" style="margin-top: 15px;">
-                        ✅ Collection complète
+                        ✅ ${data.is_oneshot ? 'One-shot - Pas de volumes' : 'Collection complète'}
                     </div>`
                 }
             </div>
@@ -514,8 +557,8 @@ async function viewSeries(seriesId) {
 }
 
 // Fonction pour enrichir une série depuis le modal
-async function enrichSeriesFromModal(seriesId, seriesTitle) {
-    const btn = event.target;
+async function enrichSeriesFromModal(seriesId, seriesTitle, evt) {
+    const btn = evt.target;
     btn.disabled = true;
     btn.textContent = '⏳ Enrichissement...';
 
@@ -544,7 +587,7 @@ async function enrichSeriesFromModal(seriesId, seriesTitle) {
 }
 
 // Fonction pour rechercher manuellement une série sur Nautiljon
-async function searchNautiljonManually(seriesId) {
+async function searchNautiljonManually(seriesId, libraryId) {
     // Naviguer vers la page Nautiljon avec la bibliothèque et la série pré-sélectionnées
     window.location.href = `/nautiljon?libraryId=${libraryId}&seriesId=${seriesId}`;
 }

@@ -50,6 +50,12 @@ def transfer_page():
     return render_template('transfer.html')
 
 
+@library_bp.route('/missing-monitor')
+def missing_monitor_page():
+    """Page de surveillance des volumes manquants"""
+    return render_template('missing-monitor.html')
+
+
 # ========== API ==========
 
 @library_bp.route('/api/libraries', methods=['GET', 'POST'])
@@ -387,7 +393,7 @@ def get_series_details(series_id):
                    l.id, l.name,
                    s.nautiljon_url, s.nautiljon_cover_path, s.nautiljon_total_volumes, s.nautiljon_french_volumes,
                    s.nautiljon_editor, s.nautiljon_status, s.nautiljon_mangaka,
-                   s.nautiljon_year_start, s.nautiljon_year_end, s.nautiljon_updated_at
+                   s.nautiljon_year_start, s.nautiljon_year_end, s.nautiljon_updated_at, s.is_oneshot
             FROM series s
             JOIN libraries l ON s.library_id = l.id
             WHERE s.id = ?
@@ -435,6 +441,7 @@ def get_series_details(series_id):
             'total_volumes': series_row[3],
             'missing_volumes': missing_volumes,
             'has_parts': bool(series_row[5]),
+            'is_oneshot': bool(series_row[18]),
             'library': {
                 'id': series_row[6],
                 'name': series_row[7]
@@ -452,6 +459,48 @@ def get_series_details(series_id):
                 'updated_at': series_row[17]
             },
             'volumes': volumes
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@library_bp.route('/api/series/<int:series_id>/toggle-oneshot', methods=['POST'])
+def toggle_series_oneshot(series_id):
+    """Bascule le statut one-shot d'une série"""
+    try:
+        conn = sqlite3.connect(current_app.config['DATABASE'])
+        cursor = conn.cursor()
+
+        # Récupérer le statut actuel
+        cursor.execute('SELECT is_oneshot FROM series WHERE id = ?', (series_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return jsonify({'error': 'Série introuvable'}), 404
+
+        current_oneshot = result[0] or 0
+        new_oneshot = 1 - current_oneshot  # Basculer entre 0 et 1
+
+        # Si on marque comme one-shot, vider les volumes manquants et les numéros de volume
+        if new_oneshot == 1:
+            cursor.execute(
+                'UPDATE series SET is_oneshot = ?, missing_volumes = ? WHERE id = ?', 
+                (new_oneshot, None, series_id)
+            )
+            # Vider aussi les numéros de volume pour les volumes existants
+            cursor.execute('UPDATE volumes SET volume_number = NULL WHERE series_id = ?', (series_id,))
+        else:
+            # Si on démarque le one-shot, juste mettre à jour le statut
+            cursor.execute('UPDATE series SET is_oneshot = ? WHERE id = ?', (new_oneshot, series_id))
+        
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'is_oneshot': bool(new_oneshot),
+            'message': 'One-shot marqué' if new_oneshot else 'One-shot démarqué'
         })
 
     except Exception as e:

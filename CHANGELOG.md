@@ -1,4 +1,216 @@
-# 🌊 Nautiljon Integration Changelog
+# Changelog - Manga Organizer
+
+---
+
+# 📚 Surveillance des Volumes Manquants
+
+**Date**: February 25, 2026  
+**Version**: 1.1.0  
+**Status**: ✅ Complete
+
+## Summary
+
+Complete implementation of an intelligent missing volume monitoring system. Automatically detects volumes missing from your collection, searches multiple sources (EBDZ, Prowlarr, Nautiljon), and sends downloads directly to qBittorrent or aMule.
+
+---
+
+## 📝 Changes Made
+
+### New Files Created
+
+#### Backend - Complete Monitoring Module
+- **[blueprints/missing_monitor/__init__.py](blueprints/missing_monitor/__init__.py)** - Blueprint initialization
+- **[blueprints/missing_monitor/detector.py](blueprints/missing_monitor/detector.py)** - Missing volume detection (~200 lines)
+  - `MissingVolumeDetector` class with series monitoring
+  - Filtering by status (incomplete, missing, all)
+  - Search query generation
+  
+- **[blueprints/missing_monitor/searcher.py](blueprints/missing_monitor/searcher.py)** - Multi-source search (~250 lines)
+  - `MissingVolumeSearcher` with 3 sources (EBDZ, Prowlarr, Nautiljon)
+  - Relevance scoring algorithm
+  - Result deduplication and ranking
+  
+- **[blueprints/missing_monitor/downloader.py](blueprints/missing_monitor/downloader.py)** - Download management (~250 lines)
+  - `MissingVolumeDownloader` for qBittorrent and aMule
+  - Automatic logging of downloads
+  - Download history retrieval
+  
+- **[blueprints/missing_monitor/scheduler.py](blueprints/missing_monitor/scheduler.py)** - Background jobs (~150 lines)
+  - `MissingVolumeScheduler` with APScheduler integration
+  - `MonitorManager` for centralized control
+  - Periodic automatic checking
+  
+- **[blueprints/missing_monitor/routes.py](blueprints/missing_monitor/routes.py)** - REST API (~320 lines)
+  - 8 API endpoints for complete control
+  - Configuration management
+  - Series monitoring
+  - Search and download triggers
+
+#### Frontend - Complete UI
+- **[templates/missing-monitor.html](templates/missing-monitor.html)** - Main page (~400 lines)
+  - 5 tabs: Overview, Series, Search, History, Config
+  - Responsive design
+  - Modal dialogs
+  - Real-time updates
+
+- **[static/css/style-missing-monitor.css](static/css/style-missing-monitor.css)** - Styling (~450 lines)
+  - Beautiful gradient design
+  - Mobile-responsive layout
+  - Toast notifications
+  - Card-based interface
+
+- **[static/js/missing-monitor.js](static/js/missing-monitor.js)** - Frontend logic (~500 lines)
+  - Complete API integration
+  - Tab management
+  - Real-time search and filtering
+  - Download management UI
+
+#### Documentation
+- **[MISSING_VOLUMES_MONITOR.md](MISSING_VOLUMES_MONITOR.md)** - Complete user guide
+  - Usage guide with examples
+  - All features documented
+  - Troubleshooting section
+  - API integration examples
+
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical summary
+  - Architecture overview
+  - Database schema
+  - Configuration reference
+  - Module documentation
+
+### Modified Files
+
+#### Core Application Files
+- **[app.py](app.py)**
+  - Added missing_monitor blueprint registration
+  - Scheduler initialization for auto-checking
+  - Configuration loading
+
+- **[config.py](config.py)**
+  - Added `MISSING_MONITOR_CONFIG_FILE` path
+  - New database tables creation method
+  - Table initialization for monitoring
+
+- **[blueprints/library/routes.py](blueprints/library/routes.py)**
+  - Added `/missing-monitor` route for the main page
+
+- **[templates/index.html](templates/index.html)**
+  - Added "📚 Surveillance" button in navigation
+
+### Database Changes
+
+#### New Tables
+- `missing_volume_monitor` - Series monitoring configuration
+  - Tracks enabled status
+  - Search sources per series
+  - Auto-download settings
+  - Last checked timestamp
+
+- `missing_volume_downloads` - Download history
+  - Title and volume number
+  - Client used (qBittorrent/aMule)
+  - Success/failure status
+  - Error messages and logs
+
+---
+
+## ✨ Key Features
+
+✅ **Automatic Detection**
+- Detects all missing volumes in tracked series
+- Updates in real-time as collection grows
+
+✅ **Multi-Source Search**
+- EBDZ.net forum integration
+- Prowlarr indexer integration
+- Nautiljon volume validation
+- Relevance scoring for best results
+
+✅ **Smart Automation**
+- Configurable check intervals (minutes/hours/days)
+- Per-series monitoring settings
+- Automatic download to qBittorrent or aMule
+- Optional 24/7 background monitoring
+
+✅ **Complete History**
+- All downloads logged with timestamps
+- Success/failure tracking
+- Error messages for debugging
+- Searchable and filterable history
+
+✅ **Flexible Configuration**
+- Global settings (sources, client preference)
+- Per-series configuration
+- Detailed logs in database
+- JSON config files for backup
+
+✅ **Web UI**
+- 5 tabs for different views
+- Real-time statistics
+- Manual search capability
+- Direct download triggering
+- Download history viewing
+
+---
+
+## 🔧 Technical Details
+
+### Architecture
+- **Modular design** with 5 specialized classes
+- **API-first** with 8 REST endpoints
+- **Background scheduling** using APScheduler
+- **Multi-threading safe** with proper context management
+
+### Database
+- 2 new tables for monitoring and history
+- Integrated with existing manga_library.db
+- Automatic table creation on startup
+
+### Configuration
+- Stored in `data/missing_monitor_config.json`
+- Encrypted password storage for API access
+- Per-series settings in database
+
+---
+
+## 🚀 Usage Quick Start
+
+1. Go to **Library → Surveillance** (or http://localhost:5000/missing-monitor)
+2. Configure settings in **⚙️ Configuration tab**
+3. Select series to monitor in **📖 Series tab**
+4. Either:
+   - **Manual**: Use **📊 Overview** → "Check Now" button
+   - **Auto**: Enable auto-check with desired interval
+5. View results in **🔍 Search** or **📜 History** tabs
+
+---
+
+## 📋 API Endpoints
+
+```
+GET  /api/missing-monitor/config               Get settings
+POST /api/missing-monitor/config               Save settings
+GET  /api/missing-monitor/series               List series
+POST /api/missing-monitor/series/<id>/monitor  Configure series
+POST /api/missing-monitor/search               Search volume
+POST /api/missing-monitor/download             Send to client
+POST /api/missing-monitor/run-check            Manual check
+GET  /api/missing-monitor/stats                Statistics
+GET  /api/missing-monitor/history              Downloads log
+```
+
+---
+
+## 🐛 Known Limitations
+
+- EBDZ search requires forum login credentials
+- Prowlarr integration depends on external service
+- aMule support is basic (ED2K conversion needed)
+- Large volume searches may take 1-2 minutes
+
+---
+
+## 🌊 Nautiljon Integration Changelog
 
 **Date**: February 16, 2026  
 **Version**: 1.0.0  

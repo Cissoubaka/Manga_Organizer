@@ -191,6 +191,102 @@ function handleFolderSelect(event) {
     }
 }
 
+async function searchSeriesGlobal() {
+    const query = document.getElementById('global-search').value.trim().toLowerCase();
+    const resultsContainer = document.getElementById('search-results-container');
+
+    if (!query) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    try {
+        // Récupérer toutes les séries de toutes les bibliothèques
+        const results = [];
+
+        for (const library of libraries) {
+            try {
+                const response = await fetch(`/api/library/${library.id}/series`);
+                if (!response.ok) continue;
+                
+                const series = await response.json();
+                
+                // Filtrer les séries qui correspondent à la recherche
+                const matching = series.filter(s => s.title.toLowerCase().includes(query));
+                
+                matching.forEach(s => {
+                    results.push({
+                        ...s,
+                        library_id: library.id,
+                        library_name: library.name
+                    });
+                });
+            } catch (error) {
+                console.error(`Erreur recherche bibliothèque ${library.id}:`, error);
+            }
+        }
+
+        // Afficher les résultats
+        if (results.length === 0) {
+            resultsContainer.innerHTML = `
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; color: #666;">
+                    Aucune série trouvée
+                </div>
+            `;
+            return;
+        }
+
+        // Grouper par bibliothèque
+        const grouped = {};
+        results.forEach(series => {
+            if (!grouped[series.library_name]) {
+                grouped[series.library_name] = [];
+            }
+            grouped[series.library_name].push(series);
+        });
+
+        let html = `
+            <div style="background: white; border-radius: 8px; padding: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #333;">📚 ${results.length} série(s) trouvée(s)</h3>
+        `;
+
+        for (const [libraryName, seriesList] of Object.entries(grouped)) {
+            html += `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #667eea; margin: 0 0 10px 0;">📖 ${escapeHtml(libraryName)}</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+            `;
+            
+            seriesList.forEach(series => {
+                html += `
+                    <div style="background: #f9fafb; padding: 12px; border-radius: 6px; cursor: pointer; border: 1px solid #e5e7eb; transition: all 0.2s;" 
+                         onmouseover="this.style.borderColor='#667eea'; this.style.boxShadow='0 2px 8px rgba(102, 126, 234, 0.1)';"
+                         onmouseout="this.style.borderColor='#e5e7eb'; this.style.boxShadow='none';" 
+                         onclick="viewSeries(${series.id})">
+                        <div style="font-weight: 600; color: #333; margin-bottom: 5px;">${escapeHtml(series.title)}</div>
+                        <div style="font-size: 0.85em; color: #666;">📖 ${series.total_volumes} volume(s)</div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+        resultsContainer.innerHTML = html;
+    } catch (error) {
+        console.error('Erreur recherche:', error);
+        resultsContainer.innerHTML = `
+            <div style="background: #fee2e2; padding: 15px; border-radius: 8px; color: #991b1b;">
+                ❌ Erreur lors de la recherche
+            </div>
+        `;
+    }
+}
+
 function escapeHtml(text) {
     const map = {
         '&': '&amp;',
@@ -202,10 +298,17 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+
+
 window.onclick = function(event) {
-    const modal = document.getElementById('create-modal');
-    if (event.target == modal) {
+    const createModal = document.getElementById('create-modal');
+    const seriesModal = document.getElementById('series-modal');
+    
+    if (event.target == createModal) {
         closeCreateModal();
+    }
+    if (event.target == seriesModal) {
+        closeModal();
     }
 }
 

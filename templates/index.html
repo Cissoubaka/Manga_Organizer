@@ -16,6 +16,7 @@
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
+                    <a href="/missing-monitor" class="btn" style="background: #f59e0b;">📚 Surveillance</a>
                     <a href="/settings" class="btn" style="background: #6c757d;">⚙️ Configuration</a>
                 </div>
             </div>
@@ -41,6 +42,14 @@
                         ➕ Créer une bibliothèque
                     </button>
                 </div>
+            </div>
+
+            <!-- Barre de recherche globale -->
+            <div style="margin-bottom: 30px;">
+                <input type="text" id="global-search" placeholder="🔍 Rechercher une série dans toutes les bibliothèques..." 
+                       onkeyup="searchSeriesGlobal()" 
+                       style="width: 100%; padding: 12px 15px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 1em;">
+                <div id="search-results-container" style="margin-top: 15px;"></div>
             </div>
 
             <div id="libraries-container">
@@ -87,6 +96,15 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal pour afficher les détails d'une série (réutilisé depuis library.html) -->
+    <div class="modal" id="series-modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="closeModal()">×</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/library.js') }}"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 Configuration centralisée de l'application
 """
 import os
+import sqlite3
 
 class Config:
     """Configuration de base"""
@@ -23,6 +24,7 @@ class Config:
     CONFIG_FILE = os.path.join(DATA_DIR, 'emule_config.json')
     EBDZ_CONFIG_FILE = os.path.join(DATA_DIR, 'ebdz_config.json')
     PROWLARR_CONFIG_FILE = os.path.join(DATA_DIR, 'prowlarr_config.json')
+    MISSING_MONITOR_CONFIG_FILE = os.path.join(DATA_DIR, 'missing_monitor_config.json')
     
     # eMule/aMule par défaut
     # Pour Docker: utiliser AMULE_HOST pour configurer l'adresse
@@ -137,6 +139,9 @@ class Config:
         # Ajouter les colonnes Nautiljon si elles n'existent pas
         Config._add_nautiljon_columns(conn, db_path)
         
+        # Ajouter les tables de surveillance des volumes manquants
+        Config._add_missing_monitor_tables(conn, db_path)
+        
         conn.close()
 
     @staticmethod
@@ -155,7 +160,8 @@ class Config:
             ('nautiljon_year_start', 'INTEGER'),
             ('nautiljon_year_end', 'INTEGER'),
             ('nautiljon_updated_at', 'TIMESTAMP'),
-            ('tags', 'TEXT')  # JSON array de tags
+            ('tags', 'TEXT'),  # JSON array de tags
+            ('is_oneshot', 'INTEGER DEFAULT 0')  # 1 = one-shot (pas de volumes)
         ]
         
         # Vérifier quelles colonnes existent
@@ -170,6 +176,51 @@ class Config:
                 except sqlite3.OperationalError as e:
                     if 'already exists' not in str(e):
                         print(f"⚠️  Impossible d'ajouter {col_name}: {e}")
+        
+        conn.commit()
+
+    @staticmethod
+    def _add_missing_monitor_tables(conn, db_path):
+        """Crée les tables de surveillance des volumes manquants si elles n'existent pas"""
+        cursor = conn.cursor()
+        
+        # Table de surveillance des bibliothèques
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS missing_volume_library (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                library_id INTEGER UNIQUE,
+                enabled INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Table de surveillance des séries
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS missing_volume_monitor (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                series_id INTEGER UNIQUE,
+                enabled INTEGER DEFAULT 1,
+                search_sources TEXT DEFAULT '["ebdz", "prowlarr"]',
+                auto_download_enabled INTEGER DEFAULT 0,
+                last_checked TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Table d'historique des téléchargements automatiques
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS missing_volume_downloads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                volume_number INTEGER,
+                client TEXT,
+                success INTEGER,
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         
         conn.commit()
 

@@ -137,6 +137,25 @@ class LibraryScanner:
         # Retirer l'extension pour faciliter le parsing
         name_without_ext = os.path.splitext(filename)[0]
 
+        # AVANT la normalisation: Extraire les résolutions depuis les crochets
+        # Patterns: [Digital-XXX], [XXX] où XXX >= 300, etc.
+        excluded_numbers = set()  # Nombres à exclure de la détection de volume (résolutions)
+        
+        # Pattern 1: [Digital-XXX] ou [ePub-XXX] (Digital/ePub resolution)
+        digital_match = re.search(r'\[(?:Digital|ePub|[0-9]p)-(\d+)\]', name_without_ext, re.IGNORECASE)
+        if digital_match:
+            excluded_numbers.add(int(digital_match.group(1)))
+            info['resolution'] = f"Digital-{digital_match.group(1)}"
+        
+        # Pattern 2: [XXX] où XXX est un nombre >= 300 (typique pour résolutions)
+        bracket_match = re.search(r'\[(\d{3,4})\]', name_without_ext)
+        if bracket_match:
+            bracket_num = int(bracket_match.group(1))
+            if bracket_num >= 300:  # Seuil: les résolutions commencent généralement à 300+
+                excluded_numbers.add(bracket_num)
+                if not info['resolution']:
+                    info['resolution'] = str(bracket_num)
+
         # AMÉLIORATION: Normaliser le nom en remplaçant les points, underscores et caractères spéciaux par des espaces
         # Sauf pour les points dans les nombres (comme 1.5)
         # On garde aussi les points dans les patterns spéciaux comme "Vol." ou "T.01"
@@ -191,7 +210,8 @@ class LibraryScanner:
                     # Filtrer les fausses détections :
                     # - Années (entre 1800-2099)
                     # - Nombres trop grands pour être des volumes (> 999)
-                    if not (1800 <= potential_volume <= 2099 or potential_volume > 999):
+                    # - Nombres qui sont des résolutions
+                    if not (1800 <= potential_volume <= 2099 or potential_volume > 999 or potential_volume in excluded_numbers):
                         info['volume'] = potential_volume
                         break
 
@@ -243,9 +263,11 @@ class LibraryScanner:
             info['year'] = int(year_match.group(1))
 
         # Extraire la résolution (1920x1080, etc.)
-        resolution_match = re.search(r'(\d{3,4}x\d{3,4})', filename)
-        if resolution_match:
-            info['resolution'] = resolution_match.group(1)
+        # Ne pas écraser la résolution déjà extraite depuis les crochets
+        if not info['resolution']:
+            resolution_match = re.search(r'(\d{3,4}x\d{3,4})', filename)
+            if resolution_match:
+                info['resolution'] = resolution_match.group(1)
 
         return info
 
@@ -574,7 +596,7 @@ class LibraryScanner:
         
         # Récupérer les infos de la série
         cursor.execute('''
-            SELECT id, library_id, title, path FROM series WHERE id = ?
+            SELECT id, library_id, title, path, is_oneshot FROM series WHERE id = ?
         ''', (series_id,))
         
         result = cursor.fetchone()
@@ -582,7 +604,13 @@ class LibraryScanner:
             conn.close()
             raise Exception(f"Série {series_id} non trouvée")
         
-        series_id, library_id, series_title, series_path = result
+        series_id, library_id, series_title, series_path, is_oneshot = result
+        
+        # Vérifier si c'est un one-shot - si oui, ne pas scanner
+        if is_oneshot:
+            conn.close()
+            print(f"⏭️  Série one-shot, pas de scan des volumes: {series_title}")
+            return 0
         
         # Vérifier que le chemin existe
         if not series_path or not os.path.exists(series_path):

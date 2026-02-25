@@ -32,6 +32,7 @@ def create_app(config_name='default'):
     from blueprints.nautiljon import nautiljon_bp
     from blueprints.settings import settings_bp
     from blueprints.qbittorrent import qbittorrent_bp
+    from blueprints.missing_monitor import missing_monitor_bp
     
     app.register_blueprint(library_bp)
     app.register_blueprint(search_bp)
@@ -41,12 +42,18 @@ def create_app(config_name='default'):
     app.register_blueprint(nautiljon_bp, url_prefix='/api/nautiljon')
     app.register_blueprint(qbittorrent_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(missing_monitor_bp, url_prefix='/api/missing-monitor')
     
     # Initialiser le scheduler EBDZ
     from blueprints.ebdz.scheduler import ebdz_scheduler
     ebdz_scheduler.init_app(app)
     
-    # Démarrer le scheduler et charger la configuration automatique
+    # Initialiser le scheduler de surveillance des volumes manquants
+    from blueprints.missing_monitor.scheduler import MissingVolumeScheduler
+    missing_volume_scheduler = MissingVolumeScheduler()
+    missing_volume_scheduler.init_app(app)
+    
+    # Démarrer les schedulers et charger les configurations automatiques
     with app.app_context():
         from blueprints.ebdz.routes import load_ebdz_config
         ebdz_config = load_ebdz_config()
@@ -56,6 +63,16 @@ def create_app(config_name='default'):
             interval_unit = ebdz_config.get('auto_scrape_interval_unit', 'minutes')
             ebdz_scheduler.add_job(interval, interval_unit)
             print(f"✓ Scraping automatique EBDZ activé: tous les {interval} {interval_unit}")
+        
+        # Charger la configuration de surveillance des volumes manquants
+        from blueprints.missing_monitor.routes import load_monitor_config
+        monitor_config = load_monitor_config()
+        
+        if monitor_config.get('auto_check_enabled', False):
+            interval = monitor_config.get('auto_check_interval', 60)
+            interval_unit = monitor_config.get('auto_check_interval_unit', 'minutes')
+            missing_volume_scheduler.add_monitor_job(interval, interval_unit)
+            print(f"✓ Surveillance des volumes manquants activée: tous les {interval} {interval_unit}")
     
     return app
 

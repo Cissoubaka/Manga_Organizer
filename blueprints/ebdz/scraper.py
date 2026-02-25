@@ -85,6 +85,23 @@ class MyBBScraper:
         if not filename:
             return None
         
+        # D'abord, vérifier si le fichier contient une résolution dans les crochets
+        # Patterns: [Digital-XXX], [ePub-XXX], [XXX] où XXX >= 300
+        # Si c'est le cas, exclure ces nombres de la détection
+        excluded_numbers = set()
+        
+        # Pattern 1: [Digital-XXX] ou [ePub-XXX]
+        digital_match = re.search(r'\[(?:Digital|ePub|[0-9]p)-(\d+)\]', filename, re.IGNORECASE)
+        if digital_match:
+            excluded_numbers.add(int(digital_match.group(1)))
+        
+        # Pattern 2: [XXX] où XXX >= 300 (résolution)
+        bracket_match = re.search(r'\[(\d{3,4})\]', filename)
+        if bracket_match:
+            bracket_num = int(bracket_match.group(1))
+            if bracket_num >= 300:
+                excluded_numbers.add(bracket_num)
+        
         # Patterns pour détecter les numéros de volume (ordonnés du plus spécifique au plus général)
         patterns = [
             # Patterns spécifiques avec préfixes clairs
@@ -112,7 +129,8 @@ class MyBBScraper:
             if match:
                 volume = int(match.group(1))
                 # Ignore les nombres qui ressemblent à des années ou des résolutions
-                if volume > 0 and volume < 500:  # Limite raisonnable pour un volume de manga
+                # Aussi exclure les nombres détectés comme résolutions
+                if volume > 0 and volume < 500 and volume not in excluded_numbers:  # Limite raisonnable pour un volume de manga
                     return volume
         
         return None

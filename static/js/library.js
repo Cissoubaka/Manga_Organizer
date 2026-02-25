@@ -295,6 +295,12 @@ async function viewSeries(seriesId) {
 
     try {
         const response = await fetch(`/api/series/${seriesId}`);
+        
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Erreur serveur ${response.status}: ${text.substring(0, 200)}`);
+        }
+        
         const data = await response.json();
         
         console.log('Données reçues:', data);
@@ -364,6 +370,9 @@ async function viewSeries(seriesId) {
                             <button class="btn" onclick="scanSeries(${seriesId})" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
                                 🔄 Scanner cette série
                             </button>
+                            <button class="btn" onclick="openRenameModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')\" style="background: rgba(255,255,255,0.2); white-space: nowrap; font-size: 0.9em;">
+                                ✏️ Renommer fichiers
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -381,6 +390,9 @@ async function viewSeries(seriesId) {
                         </button>
                         <button class="btn" onclick="scanSeries(${seriesId})" style="background: #10b981;">
                             🔄 Scanner cette série
+                        </button>
+                        <button class="btn" onclick="openRenameModal(${seriesId}, '${data.title.replace(/'/g, "\\'")}')" style="background: #8b5cf6;">
+                            ✏️ Renommer fichiers
                         </button>
                     </p>
                 </div>
@@ -859,6 +871,12 @@ function escapeHtml(text) {
 async function loadAndDisplayTags(seriesId) {
     try {
         const response = await fetch(`/api/series/${seriesId}/tags`);
+        
+        if (!response.ok) {
+            console.warn(`Erreur chargement tags: ${response.status}`);
+            return;
+        }
+        
         const data = await response.json();
         
         const tagsList = document.getElementById(`tags-list-${seriesId}`);
@@ -1038,6 +1056,291 @@ window.onclick = function(event) {
         closeSearchModal();
     }
 }
+
+// ========== RENOMMAGE DE FICHIERS ==========
+
+let currentRenameSeriesId = null;
+let currentRenameSeries = null;
+
+async function openRenameModal(seriesId, seriesTitle) {
+    currentRenameSeriesId = seriesId;
+    currentRenameSeries = {
+        id: seriesId,
+        title: seriesTitle
+    };
+    
+    // Créer le modal de renommage s'il n'existe pas
+    let renameModal = document.getElementById('rename-modal');
+    if (!renameModal) {
+        renameModal = document.createElement('div');
+        renameModal.id = 'rename-modal';
+        renameModal.className = 'modal rename-modal';
+        document.body.appendChild(renameModal);
+    }
+    
+    renameModal.innerHTML = `
+        <div class="modal-content rename-modal-content">
+            <span class="close-modal" onclick="closeRenameModal()">×</span>
+            <div class="rename-modal-header">
+                <h2>✏️ Renommer les fichiers</h2>
+                <p class="rename-modal-subtitle">Série: <strong>${escapeHtml(seriesTitle)}</strong></p>
+            </div>
+            
+            <div class="rename-modal-body">
+                <div class="rename-section">
+                    <h3>Pattern de renommage</h3>
+                    <p class="rename-help-text">Utilisez des tags pour personnaliser les noms de fichiers:</p>
+                    
+                    <div class="tags-reference">
+                        <div class="tag-info">
+                            <code>[T]</code> - Titre de la série
+                        </div>
+                        <div class="tag-info">
+                            <code>[V]</code> - Numéro de volume
+                        </div>
+                        <div class="tag-info">
+                            <code>[C:départ:longueur]</code> - Compteur (Ex: [C:01:3] = 001, 002, ...)
+                        </div>
+                        <div class="tag-info">
+                            <code>[E]</code> - Extension du fichier (Ex: pdf, cbz)
+                        </div>
+                        <div class="tag-info">
+                            <code>[N]</code> - Nom du fichier original
+                        </div>
+                        <div class="tag-info">
+                            <code>[P]</code> - Numéro de partie (si applicable)
+                        </div>
+                    </div>
+                    
+                    <label>Exemple de patterns:</label>
+                    <ul style="margin: 10px 0; font-size: 0.9em; color: #666;">
+                        <li><code>[T] - Vol [V].[E]</code> → "Mon Manga - Vol 1.pdf"</li>
+                        <li><code>[T] [C:01:3].[E]</code> → "Mon Manga 001.pdf"</li>
+                        <li><code>[C:01:2] - [N].[E]</code> → "01 - Original Name.pdf"</li>
+                    </ul>
+                    
+                    <div style="margin-top: 15px;">
+                        <label for="rename-pattern-input">Votre pattern:</label>
+                        <input 
+                            type="text" 
+                            id="rename-pattern-input" 
+                            class="rename-pattern-input"
+                            placeholder="Ex: [T] - Vol [V].[E]"
+                            onkeyup="updateRenamePreview()">
+                    </div>
+                </div>
+                
+                <div class="rename-section">
+                    <h3>Aperçu du renommage</h3>
+                    <div id="rename-preview-container" class="rename-preview-container">
+                        <p style="color: #999; text-align: center; padding: 20px;">
+                            Entrez un pattern pour voir l'aperçu du renommage
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button onclick="closeRenameModal()" class="btn" style="background: #e5e7eb; color: #333;">Annuler</button>
+                    <button onclick="executeRename()" class="btn" style="background: #10b981;">✅ Appliquer le renommage</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    renameModal.classList.add('active');
+}
+
+function closeRenameModal() {
+    const modal = document.getElementById('rename-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    currentRenameSeriesId = null;
+    currentRenameSeries = null;
+}
+
+async function updateRenamePreview() {
+    const pattern = document.getElementById('rename-pattern-input').value;
+    const previewContainer = document.getElementById('rename-preview-container');
+    
+    if (!pattern.trim()) {
+        previewContainer.innerHTML = `
+            <p style="color: #999; text-align: center; padding: 20px;">
+                Entrez un pattern pour voir l'aperçu du renommage
+            </p>
+        `;
+        return;
+    }
+    
+    previewContainer.innerHTML = `
+        <div class="loading" style="padding: 20px;">
+            <div class="spinner"></div>
+            <p>Calcul de l'aperçu...</p>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/api/series/${currentRenameSeriesId}/rename/preview`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                pattern: pattern
+            })
+        });
+        
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Erreur serveur ${response.status}: ${text.substring(0, 100)}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            previewContainer.innerHTML = `
+                <div class="error-message" style="padding: 15px; background: #fee; border: 1px solid #f99; border-radius: 4px; color: #c33;">
+                    ❌ ${escapeHtml(data.error)}
+                </div>
+            `;
+            return;
+        }
+        
+        if (data.preview && data.preview.length > 0) {
+            previewContainer.innerHTML = `
+                <div class="rename-preview-list">
+                    ${data.preview.map((item, idx) => `
+                        <div class="rename-preview-item">
+                            <div class="rename-preview-old">
+                                <span class="rename-preview-label">Avant:</span>
+                                <code>${escapeHtml(item.old_name)}</code>
+                            </div>
+                            <div class="rename-preview-arrow">→</div>
+                            <div class="rename-preview-new">
+                                <span class="rename-preview-label">Après:</span>
+                                <code>${escapeHtml(item.new_name)}</code>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            previewContainer.innerHTML = `
+                <p style="color: #999; text-align: center; padding: 20px;">
+                    Aucun fichier à renommer
+                </p>
+            `;
+        }
+    } catch (error) {
+        previewContainer.innerHTML = `
+            <div class="error-message" style="padding: 15px; background: #fee; border: 1px solid #f99; border-radius: 4px; color: #c33;">
+                ❌ Erreur: ${escapeHtml(error.message)}
+            </div>
+        `;
+    }
+}
+
+async function executeRename() {
+    const pattern = document.getElementById('rename-pattern-input').value;
+    
+    if (!pattern.trim()) {
+        alert('Veuillez entrer un pattern de renommage');
+        return;
+    }
+    
+    if (!confirm('Êtes-vous sûr de vouloir renommer tous les fichiers de cette série?\n\nCette action ne peut pas être annulée.')) {
+        return;
+    }
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ Renommage en cours...';
+    
+    try {
+        // D'abord récupérer les fichiers via l'aperçu
+        const previewResponse = await fetch(`/api/series/${currentRenameSeriesId}/rename/preview`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                pattern: pattern
+            })
+        });
+        
+        if (!previewResponse.ok) {
+            const text = await previewResponse.text();
+            throw new Error(`Erreur serveur ${previewResponse.status}: ${text.substring(0, 200)}`);
+        }
+        
+        const previewData = await previewResponse.json();
+        
+        if (previewData.error) {
+            alert(`Erreur: ${previewData.error}`);
+            btn.disabled = false;
+            btn.textContent = '✅ Appliquer le renommage';
+            return;
+        }
+        
+        // Extraire les noms de fichiers
+        const filesToRename = previewData.preview.map(item => item.old_name);
+        
+        // Exécuter le renommage
+        const executeResponse = await fetch(`/api/series/${currentRenameSeriesId}/rename/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                pattern: pattern,
+                files: filesToRename
+            })
+        });
+        
+        if (!executeResponse.ok) {
+            const text = await executeResponse.text();
+            throw new Error(`Erreur serveur ${executeResponse.status}: ${text.substring(0, 200)}`);
+        }
+        
+        const executeData = await executeResponse.json();
+        
+        if (executeData.error) {
+            alert(`Erreur: ${executeData.error}`);
+            btn.disabled = false;
+            btn.textContent = '✅ Appliquer le renommage';
+            return;
+        }
+        
+        // Afficher le résultat
+        const successful = executeData.results.filter(r => r.success).length;
+        const failed = executeData.results.filter(r => !r.success).length;
+        
+        let resultMessage = `✅ Renommage terminé!\n\n${successful} fichier(s) renommé(s)`;
+        if (failed > 0) {
+            resultMessage += `\n⚠️ ${failed} erreur(s)`;
+        }
+        
+        alert(resultMessage);
+        
+        // Fermer les modals et recharger la liste des séries
+        closeRenameModal();
+        closeModal();
+        loadLibraryData();
+        
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+        btn.disabled = false;
+        btn.textContent = '✅ Appliquer le renommage';
+    }
+}
+
+// Fermer le modal de renommage quand on clique en dehors
+document.addEventListener('click', function(event) {
+    const renameModal = document.getElementById('rename-modal');
+    if (renameModal && event.target == renameModal) {
+        closeRenameModal();
+    }
+});
 
 window.addEventListener('load', function() {
     loadLibraryInfo();

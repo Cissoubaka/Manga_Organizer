@@ -1134,3 +1134,140 @@ def cleanup_import_directory():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ========== RENOMMAGE DE FICHIERS ==========
+
+@library_bp.route('/api/series/<int:series_id>/rename/preview', methods=['POST'])
+def preview_rename(series_id):
+    """Génère un aperçu du renommage avant de l'effectuer"""
+    try:
+        data = request.get_json()
+        pattern = data.get('pattern', '')
+        
+        if not pattern:
+            return jsonify({'error': 'Pattern vide'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Récupérer les infos de la série
+        cursor.execute('''
+            SELECT s.id, s.title, s.path
+            FROM series s
+            WHERE s.id = ?
+        ''', (series_id,))
+        
+        series = cursor.fetchone()
+        if not series:
+            return jsonify({'error': 'Série introuvable'}), 404
+        
+        series_id, series_title, series_path = series
+        
+        # Récupérer tous les volumes
+        cursor.execute('''
+            SELECT filename, volume_number, part_number
+            FROM volumes
+            WHERE series_id = ?
+            ORDER BY part_number, volume_number
+        ''', (series_id,))
+        
+        volumes = []
+        for vol in cursor.fetchall():
+            volumes.append({
+                'filename': vol[0],
+                'volume_number': vol[1],
+                'part_number': vol[2],
+                'series_title': series_title
+            })
+        
+        conn.close()
+        
+        if not volumes:
+            return jsonify({'error': 'Aucun volume trouvé'}), 404
+        
+        # Générer l'aperçu
+        from rename_handler import RenamePattern
+        
+        rename_pattern = RenamePattern(pattern)
+        is_valid, error = rename_pattern.validate()
+        
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        preview = rename_pattern.preview(volumes)
+        
+        return jsonify({
+            'success': True,
+            'series_title': series_title,
+            'series_path': series_path,
+            'preview': preview
+        })
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/series/<int:series_id>/rename/execute', methods=['POST'])
+def execute_rename(series_id):
+    """Effectue le renommage des fichiers de la série"""
+    try:
+        data = request.get_json()
+        pattern = data.get('pattern', '')
+        files_to_rename = data.get('files', [])
+        
+        if not pattern or not files_to_rename:
+            return jsonify({'error': 'Pattern ou liste de fichiers manquante'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Récupérer les infos de la série
+        cursor.execute('''
+            SELECT s.id, s.title, s.path
+            FROM series s
+            WHERE s.id = ?
+        ''', (series_id,))
+        
+        series = cursor.fetchone()
+        if not series:
+            return jsonify({'error': 'Série introuvable'}), 404
+        
+        series_id, series_title, series_path = series
+        conn.close()
+        
+        # Effectuer le renommage
+        from rename_handler import FileRenamer
+        
+        success, results, error = FileRenamer.rename_series_files(
+            series_path=series_path,
+            pattern=pattern,
+            files_to_rename=files_to_rename,
+            series_title=series_title,
+            dry_run=False
+        )
+        
+        if not success:
+            return jsonify({'error': error}), 500
+        
+        # Après succès, rescanner la série pour mettre à jour la base de données
+        try:
+            from .scanner import LibraryScanner
+            scanner = LibraryScanner()
+            scanner.scan_single_series(series_id)
+        except Exception as e:
+            print(f"Erreur lors du re-scan: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

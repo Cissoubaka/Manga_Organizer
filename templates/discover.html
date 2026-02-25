@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Découvrir et ajouter des séries</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-discover.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>🎯 Découvrir et ajouter des séries</h1>
+                    <p class="subtitle">Cherchez, sélectionnez une bibliothèque, puis trouvez des sources</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="discover-container">
+            <!-- ÉTAPE 1: Recherche sur Nautiljon -->
+            <section class="step" id="step-1">
+                <div class="step-header">
+                    <h2>📖 Étape 1: Rechercher une série</h2>
+                </div>
+                
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        id="seriesNameInput" 
+                        class="search-input" 
+                        placeholder="Entrez le nom d'une série..."
+                        onkeypress="if(event.key === 'Enter') searchNautiljon()"
+                    >
+                    <button class="btn-primary" onclick="searchNautiljon()">🔍 Chercher sur Nautiljon</button>
+                </div>
+
+                <div id="nautiljon-loading" class="loading" style="display:none;">
+                    Recherche en cours sur Nautiljon...
+                </div>
+
+                <div id="nautiljon-results" class="results-box" style="display:none;">
+                    <div class="results-header">
+                        <h3>Résultats trouvés</h3>
+                        <span id="results-count" class="results-count"></span>
+                    </div>
+                    <div id="results-list" class="results-list"></div>
+                </div>
+
+                <div id="nautiljon-error" class="error-box" style="display:none;"></div>
+            </section>
+
+            <!-- ÉTAPE 2: Sélectionner une série et une bibliothèque -->
+            <section class="step" id="step-2" style="display:none;">
+                <div class="step-header">
+                    <h2>📚 Étape 2: Choisir une bibliothèque</h2>
+                    <button class="btn-secondary" onclick="resetToStep1()">Changer de série</button>
+                </div>
+
+                <div class="selection-info">
+                    <div class="selected-series">
+                        <h3>Série sélectionnée</h3>
+                        <div id="selected-series-display" class="series-display"></div>
+                    </div>
+
+                    <div class="library-selection">
+                        <h3>Choisir une bibliothèque</h3>
+                        <div id="libraries-list" class="libraries-list"></div>
+                    </div>
+                </div>
+
+                <div id="library-loading" class="loading" style="display:none;">
+                    Chargement des bibliothèques...
+                </div>
+
+                <div id="series-verification-loading" class="loading" style="display:none;">
+                    📁 Vérification de la série...
+                </div>
+
+                <div id="library-error" class="error-box" style="display:none;"></div>
+            </section>
+
+            <!-- ÉTAPE 3: Recherche dans les sources (EBDZ + Prowlarr) -->
+            <section class="step" id="step-3" style="display:none;">
+                <div class="step-header">
+                    <h2>🔗 Étape 3: Chercher les sources</h2>
+                    <button class="btn-secondary" onclick="resetToStep2()">Changer de bibliothèque</button>
+                </div>
+
+                <div class="sources-info">
+                    <div class="selected-summary">
+                        <h3>Résumé</h3>
+                        <div id="selection-summary" class="summary-box"></div>
+                    </div>
+
+                    <div class="sources-search">
+                        <h3>Recherche dans les sources</h3>
+                        <div class="source-controls">
+                            <label>
+                                <input type="checkbox" id="search-ebdz" checked> EBDZ (EdZ)
+                            </label>
+                            <label>
+                                <input type="checkbox" id="search-prowlarr" checked> Prowlarr
+                            </label>
+                            <input 
+                                type="number" 
+                                id="volume-override" 
+                                min="1"
+                                placeholder="Numéro de volume (optionnel)"
+                                class="volume-input"
+                            >
+                            <button class="btn-primary" onclick="searchSources()">🔎 Chercher les sources</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sources-loading" class="loading" style="display:none;">
+                    Recherche en cours...
+                </div>
+
+                <div id="sources-results" class="results-box" style="display:none;">
+                    <div class="results-header">
+                        <h3>Résultats des sources</h3>
+                    </div>
+                    
+                    <div id="ebdz-results" class="source-results" style="display:none;">
+                        <h4>📔 Résultats EBDZ</h4>
+                        <div id="ebdz-list" class="results-list"></div>
+                    </div>
+
+                    <div id="prowlarr-results" class="source-results" style="display:none;">
+                        <h4>🔎 Résultats Prowlarr</h4>
+                        <div id="prowlarr-list" class="results-list"></div>
+                    </div>
+                </div>
+
+                <div id="sources-error" class="error-box" style="display:none;"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/discover.js') }}"></script>
+</body>
+</html>

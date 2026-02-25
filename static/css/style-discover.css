@@ -1,0 +1,652 @@
+/* =====================================================
+   Style pour la page de découverte de séries
+   ===================================================== */
+
+:root {
+    --primary-color: #667eea;
+    --primary-darker: #5568d3;
+    --secondary-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #3b82f6;
+    --success-color: #10b981;
+    --border-color: #e5e7eb;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --bg-light: #f9fafb;
+    --bg-lighter: #f3f4f6;
+}
+
+.discover-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    padding: 20px 0;
+}
+
+/* =====================================================
+   Sections des étapes
+   ===================================================== */
+
+.step {
+    background: white;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+    padding: 25px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.step-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+}
+
+/* =====================================================
+   Boîtes de recherche
+   ===================================================== */
+
+.search-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 15px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.volume-input {
+    width: 120px;
+    padding: 12px 15px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+/* =====================================================
+   Boutons
+   ===================================================== */
+
+.btn-primary,
+.btn-secondary {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-darker);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: var(--text-secondary);
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.btn-secondary:hover {
+    background: var(--text-primary);
+}
+
+/* =====================================================
+   Résultats
+   ===================================================== */
+
+.results-box {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.results-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.results-count {
+    background: var(--primary-color);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.results-list {
+    display: grid;
+    gap: 15px;
+}
+
+/* =====================================================
+   Éléments de résultat Nautiljon
+   ===================================================== */
+
+.result-item {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.result-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.result-item.selected {
+    background: rgba(102, 126, 234, 0.05);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.result-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.result-url {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    margin: 0;
+    word-break: break-all;
+}
+
+.result-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.btn-select {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-select:hover {
+    background: var(--primary-darker);
+}
+
+.btn-select.selected {
+    background: var(--success-color);
+}
+
+/* Boutons de téléchargement */
+
+.btn-download {
+    flex: 1;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-download-ed2k {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.btn-download-ed2k:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-download-torrent {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    color: white;
+}
+
+.btn-download-torrent:hover {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+}
+
+/* =====================================================
+   Sélection de série et bibliothèque
+   ===================================================== */
+
+.selection-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .selection-info {
+        grid-template-columns: 1fr;
+    }
+}
+
+.selected-series,
+.library-selection {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.selected-series h3,
+.library-selection h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.series-display {
+    background: white;
+    border: 2px solid var(--primary-color);
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.series-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.series-url {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    margin: 0;
+    word-break: break-all;
+}
+
+.series-link {
+    display: inline-block;
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.series-link:hover {
+    background: var(--primary-darker);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* =====================================================
+   Liste des bibliothèques
+   ===================================================== */
+
+.libraries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.library-item {
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.library-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.library-item.selected {
+    background: rgba(102, 126, 234, 0.05);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.library-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 5px 0;
+}
+
+.library-path {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.library-stats {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* =====================================================
+   Résumé et sources
+   ===================================================== */
+
+.sources-info {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 25px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .sources-info {
+        grid-template-columns: 1fr;
+    }
+}
+
+.selected-summary,
+.sources-search {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.selected-summary h3,
+.sources-search h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.summary-box {
+    background: white;
+    border-left: 4px solid var(--primary-color);
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.summary-item {
+    margin-bottom: 12px;
+}
+
+.summary-item:last-child {
+    margin-bottom: 0;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+}
+
+.summary-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* =====================================================
+   Contrôles sources
+   ===================================================== */
+
+.source-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.source-controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.source-controls input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.source-controls input[type="number"] {
+    padding: 10px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+/* =====================================================
+   Résultats des sources
+   ===================================================== */
+
+.source-results {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.source-results h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+/* Source-specific result items */
+
+.ebdz-result-item,
+.prowlarr-result-item {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.ebdz-result-item:last-child,
+.prowlarr-result-item:last-child {
+    margin-bottom: 0;
+}
+
+.result-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.result-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.result-meta > span {
+    margin-right: 12px;
+    display: inline-block;
+}
+
+/* =====================================================
+   États de chargement et messages
+   ===================================================== */
+
+.loading {
+    padding: 20px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-weight: 500;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.error-box {
+    padding: 15px;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    color: #991b1b;
+    font-weight: 500;
+    margin-top: 15px;
+}
+
+.success-message {
+    padding: 15px;
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    color: #065f46;
+    font-weight: 500;
+    margin-top: 15px;
+}
+
+/* =====================================================
+   Responsive
+   ===================================================== */
+
+@media (max-width: 768px) {
+    .step {
+        padding: 20px 15px;
+    }
+
+    .step-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .step-header h2 {
+        font-size: 1.3rem;
+    }
+
+    .search-box {
+        flex-direction: column;
+    }
+
+    .search-input,
+    .btn-primary,
+    .btn-secondary {
+        width: 100%;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        min-width: unset;
+    }
+
+    .result-actions {
+        flex-direction: column;
+    }
+
+    .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+
+/* =====================================================
+   Message de chargement
+   ===================================================== */
+
+.loading-message {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

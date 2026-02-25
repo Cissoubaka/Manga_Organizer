@@ -1271,3 +1271,80 @@ def execute_rename(series_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/libraries/<int:library_id>/create-series', methods=['POST'])
+def create_series_directory(library_id):
+    """Crée un répertoire pour une nouvelle série dans une bibliothèque"""
+    try:
+        data = request.get_json()
+        series_name = data.get('series_name', '').strip()
+        
+        if not series_name:
+            return jsonify({'error': 'Le nom de la série est requis'}), 400
+        
+        # Récupérer les infos de la bibliothèque
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT path FROM libraries WHERE id = ?', (library_id,))
+        library = cursor.fetchone()
+        
+        if not library:
+            conn.close()
+            return jsonify({'error': 'Bibliothèque non trouvée'}), 404
+        
+        library_path = library['path']
+        
+        # Vérifier si la série existe déjà dans la base de données
+        cursor.execute('''
+            SELECT id FROM series WHERE library_id = ? AND title = ?
+        ''', (library_id, series_name))
+        existing_series = cursor.fetchone()
+        series_exists_in_db = existing_series is not None
+        
+        # Construire le chemin du répertoire de la série
+        series_path = os.path.join(library_path, series_name)
+        
+        # Vérifier si le répertoire existe déjà
+        directory_exists = os.path.exists(series_path)
+        
+        if series_exists_in_db or directory_exists:
+            conn.close()
+            return jsonify({
+                'success': True,
+                'path': series_path,
+                'message': 'La série existe déjà',
+                'series_exists_in_db': series_exists_in_db,
+                'directory_exists': directory_exists,
+                'exists': True
+            })
+        
+        try:
+            # Créer le répertoire
+            os.makedirs(series_path, exist_ok=True)
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'path': series_path,
+                'message': f'Répertoire créé : {series_path}',
+                'series_exists_in_db': False,
+                'directory_exists': False,
+                'exists': False
+            })
+        
+        except PermissionError:
+            conn.close()
+            return jsonify({
+                'error': f'Permission refusée pour créer le répertoire : {series_path}'
+            }), 403
+        
+        except OSError as e:
+            conn.close()
+            return jsonify({'error': f'Erreur lors de la création du répertoire : {str(e)}'}), 500
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

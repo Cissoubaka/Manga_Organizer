@@ -7,7 +7,38 @@ import sqlite3
 import requests
 import json
 import os
+import re
 from encryption import decrypt
+
+
+def clean_series_name(name):
+    """
+    Nettoie le nom d'une série pour normaliser les résultats de recherche
+    Enlève les ponctuations inutiles, normalise les espaces
+    """
+    if not name:
+        return ""
+    
+    # Convertir en minuscules pour uniformiser
+    cleaned = name.lower().strip()
+    
+    # Enlever les ponctuations inutiles (virgules, points, apostrophes, deux-points, etc)
+    # mais garder les tirets et les parenthèses (elles peuvent être importantes)
+    # Utiliser une liste de caractères à enlever
+    chars_to_remove = ',;:\'"' + '`'  # virgule, point-virgule, deux-points, guillemets, apostrophe, backtick
+    for char in chars_to_remove:
+        cleaned = cleaned.replace(char, '')
+    
+    # Enlever aussi les points
+    cleaned = cleaned.replace('.', '')
+    
+    # Normaliser les espaces multiples en un seul espace
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # Enlever les espaces avant/après
+    cleaned = cleaned.strip()
+    
+    return cleaned
 
 
 def get_db_connection():
@@ -63,8 +94,9 @@ def search_prowlarr(query, volume):
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'http://' + url
         
-        # Construire le titre de recherche
-        search_title = query
+        # Nettoyer et construire le titre de recherche
+        clean_query = clean_series_name(query)
+        search_title = clean_query
         if volume:
             search_title += f' {volume}'
         
@@ -197,6 +229,12 @@ def search_page():
                           database_empty=not table_exists)
 
 
+@search_bp.route('/discover')
+def discover_page():
+    """Page de découverte et ajout de séries"""
+    return render_template('discover.html')
+
+
 @search_bp.route('/api/search')
 def search_ed2k():
     """Recherche de liens ED2K et Prowlarr"""
@@ -269,3 +307,113 @@ def search_ed2k():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@search_bp.route('/api/search/ebdz')
+def search_ebdz_api():
+    """API pour rechercher dans la base ED2K (pour la page discover)"""
+    query = request.args.get('q', '').strip()
+    volume = request.args.get('volume', '').strip()
+    category = request.args.get('category', '').strip()
+
+    if not query:
+        return jsonify({
+            'success': False,
+            'error': 'Paramètre q requis'
+        }), 400
+
+    try:
+        results = []
+        
+        conn = sqlite3.connect(current_app.config['DB_FILE'], timeout=30.0)
+        cursor = conn.cursor()
+        
+        # Vérifier si la table ed2k_links existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ed2k_links'")
+        if cursor.fetchone() is not None:
+            # Nettoyer la requête pour une meilleure correspondance
+            clean_query = clean_series_name(query)
+            
+            sql = '''
+                SELECT DISTINCT thread_id, thread_title, thread_url, forum_category, 
+                       link, filename, filesize, volume
+                FROM ed2k_links
+                WHERE 1=1
+            '''
+            params = []
+
+            # Recherche avec la version nettoyée ET la version originale
+            # Cela permet de trouver des résultats même si les données stockées diffèrent légèrement
+            sql += ' AND (thread_title LIKE ? OR filename LIKE ? OR thread_title LIKE ? OR filename LIKE ?)'
+            search_term_clean = f'%{clean_query}%'
+            search_term_orig = f'%{query}%'
+            params.extend([search_term_clean, search_term_clean, search_term_orig, search_term_orig])
+
+            if volume:
+                try:
+                    sql += ' AND volume = ?'
+                    params.append(int(volume))
+                except ValueError:
+                    pass
+
+            if category:
+                sql += ' AND forum_category = ?'
+                params.append(category)
+
+            sql += ' ORDER BY volume DESC, thread_id DESC LIMIT 50'
+
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+
+            for row in rows:
+                results.append({
+                    'thread_id': row[0],
+                    'title': row[1],
+                    'forum': row[3],
+                    'filename': row[5],
+                    'size': row[6],
+                    'volume': row[7],
+                    'ed2k_link': row[4]
+                })
+
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        print(f"Erreur recherche EBDZ: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@search_bp.route('/api/search/prowlarr')
+def search_prowlarr_api():
+    """API pour rechercher dans Prowlarr (pour la page discover)"""
+    query = request.args.get('q', '').strip()
+    volume = request.args.get('volume', '').strip()
+
+    if not query:
+        return jsonify({
+            'success': False,
+            'error': 'Paramètre q requis'
+        }), 400
+
+    try:
+        results = search_prowlarr(query, volume)
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        print(f"Erreur recherche Prowlarr: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

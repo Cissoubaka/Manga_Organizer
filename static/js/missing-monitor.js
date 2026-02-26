@@ -11,16 +11,75 @@ let selectedLibraries = [];
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
-    initializeTabs();
-    loadStats();
-    loadLibraries();
-    loadDownloadHistory();
-    loadConfig();
+    console.log('🚀 DOMContentLoaded triggered - Initializing missing-monitor page');
     
-    // Événements de recherche
-    document.getElementById('series-search').addEventListener('input', filterSeries);
-    document.getElementById('series-status-filter').addEventListener('change', filterSeries);
-    document.getElementById('history-filter').addEventListener('change', filterHistory);
+    try {
+        initializeTabs();
+        console.log('✅ Tabs initialized');
+    } catch (e) {
+        console.error('❌ Erreur initializeTabs:', e);
+    }
+    
+    try {
+        loadStats();
+        console.log('✅ Stats loaded');
+    } catch (e) {
+        console.error('❌ Erreur loadStats:', e);
+    }
+    
+    try {
+        loadLibraries();
+        // Initialiser le filtre par défaut
+        document.getElementById('filter-all-series')?.classList.add('active');
+        console.log('✅ Libraries loaded');
+    } catch (e) {
+        console.error('❌ Erreur loadLibraries:', e);
+    }
+    
+    try {
+        loadDownloadHistory();
+        console.log('✅ Download history loaded');
+    } catch (e) {
+        console.error('❌ Erreur loadDownloadHistory:', e);
+    }
+    
+    // Configuration moved to /settings - no longer loading here
+    console.log('✅ Configuration is now managed in /settings');
+    
+    // Événements de recherche avec vérifications
+    const seriesSearch = document.getElementById('series-search');
+    if (seriesSearch) {
+        seriesSearch.addEventListener('input', filterSeries);
+        console.log('✅ Series search listener added');
+    } else {
+        console.warn('⚠️ series-search element not found');
+    }
+    
+    const seriesStatusFilter = document.getElementById('series-status-filter');
+    if (seriesStatusFilter) {
+        seriesStatusFilter.addEventListener('change', filterSeries);
+        console.log('✅ Series status filter listener added');
+    } else {
+        console.warn('⚠️ series-status-filter element not found');
+    }
+    
+    const seriesBadgesFilter = document.getElementById('series-badges-filter');
+    if (seriesBadgesFilter) {
+        seriesBadgesFilter.addEventListener('change', filterSeries);
+        console.log('✅ Series badges filter listener added');
+    } else {
+        console.warn('⚠️ series-badges-filter element not found');
+    }
+    
+    const historyFilter = document.getElementById('history-filter');
+    if (historyFilter) {
+        historyFilter.addEventListener('change', filterHistory);
+        console.log('✅ History filter listener added');
+    } else {
+        console.warn('⚠️ history-filter element not found');
+    }
+    
+    console.log('🎉 Page initialization complete');
 });
 
 // ========== TAB MANAGEMENT ==========
@@ -29,9 +88,19 @@ function initializeTabs() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabPanes = document.querySelectorAll('.tab-pane');
     
+    console.log('initializeTabs called - found', tabButtons.length, 'buttons and', tabPanes.length, 'panes');
+    
     tabButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function(e) {
+            // Skip if not a real tab button (e.g., configuration link)
+            if (!this.hasAttribute('data-tab')) {
+                console.log('Skipping non-tab button');
+                return;
+            }
+            
+            e.preventDefault();
             const tabName = this.getAttribute('data-tab');
+            console.log('Tab clicked:', tabName);
             
             // Supprimer active de tous les boutons et panes
             tabButtons.forEach(btn => btn.classList.remove('active'));
@@ -39,7 +108,11 @@ function initializeTabs() {
             
             // Ajouter active au bouton et pane cliqué
             this.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
+            const targetPane = document.getElementById(tabName);
+            console.log('Target pane:', targetPane ? 'Found' : 'Not found');
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
         });
     });
 }
@@ -230,6 +303,7 @@ async function loadMonitoredSeries() {
 function filterSeries() {
     const searchTerm = document.getElementById('series-search').value.toLowerCase();
     const statusFilter = document.getElementById('series-status-filter').value;
+    const monitoredFilter = sessionStorage.getItem('monitoredFilter') || 'all';
     
     let filtered = currentSeriesData;
     
@@ -240,7 +314,7 @@ function filterSeries() {
         );
     }
     
-    // Filtre par statut
+    // Filtre par statut (manquant/complète)
     if (statusFilter === 'missing') {
         filtered = filtered.filter(s => 
             s.nautiljon_status && 
@@ -253,7 +327,33 @@ function filterSeries() {
         );
     }
     
+    // Filtre par statut monitored
+    if (monitoredFilter === 'monitored') {
+        filtered = filtered.filter(s => s.enabled !== 0);
+    } else if (monitoredFilter === 'not-monitored') {
+        filtered = filtered.filter(s => s.enabled === 0);
+    }
+    
     displaySeriesGrid(filtered);
+}
+
+function filterByMonitoredStatus(status) {
+    sessionStorage.setItem('monitoredFilter', status);
+    
+    // Mettre à jour les styles des boutons
+    document.getElementById('filter-all-series')?.classList.remove('active');
+    document.getElementById('filter-monitored')?.classList.remove('active');
+    document.getElementById('filter-not-monitored')?.classList.remove('active');
+    
+    if (status === 'monitored') {
+        document.getElementById('filter-monitored')?.classList.add('active');
+    } else if (status === 'not-monitored') {
+        document.getElementById('filter-not-monitored')?.classList.add('active');
+    } else {
+        document.getElementById('filter-all-series')?.classList.add('active');
+    }
+    
+    filterSeries();
 }
 
 function displaySeriesGrid(series) {
@@ -327,7 +427,7 @@ async function configureSeriesMonitor(seriesId) {
     
     if (!confirmed) return;
     
-    const autoDownload = false; // Pour l'instant, désactivé par défaut
+    const autoDownload = true; // Activé par défaut
     
     try {
         const response = await fetch(`/api/missing-monitor/series/${seriesId}/monitor`, {
@@ -407,38 +507,149 @@ async function searchVolume() {
 function displaySearchResults(results, query) {
     const section = document.getElementById('search-results-section');
     const container = document.getElementById('search-results');
+    const noResults = document.getElementById('no-search-yet');
     
     if (!results || results.length === 0) {
         section.style.display = 'none';
+        if (noResults) noResults.style.display = 'block';
         showToast('Aucun résultat trouvé', 'info');
         return;
     }
     
+    if (noResults) noResults.style.display = 'none';
     section.style.display = 'block';
     
-    container.innerHTML = results.map(result => {
-        const seeders = result.seeders ? `👥 ${result.seeders} seeders` : '';
-        const size = result.size ? `${(result.size / 1073741824).toFixed(2)} GB` : '';
+    // Charger la configuration pour respecter l'ordre des sources
+    fetch('/api/missing-monitor/config')
+        .then(r => r.json())
+        .then(config => {
+            // Déterminer l'ordre des sources à partir de la requête
+            // Pour maintenant, on teste les deux configurations possibles
+            let sources = [];
+            
+            // Essayer de déterminer quelle configuration a été utilisée
+            const hasEBDZ = results.some(r => r.source === 'ebdz');
+            const hasProwlarr = results.some(r => r.source === 'prowlarr');
+            
+            if (hasEBDZ && hasProwlarr) {
+                // Sa vient de search_for_volume qui utilise la config manquant_volume ou new_volume
+                // On va supposer que c'est missing_volume par défaut
+                sources = config.monitor_missing_volumes?.search_sources || ['ebdz', 'prowlarr'];
+            } else if (hasProwlarr) {
+                sources = config.monitor_missing_volumes?.search_sources || ['ebdz', 'prowlarr'];
+            } else {
+                sources = config.monitor_missing_volumes?.search_sources || ['ebdz', 'prowlarr'];
+            }
+            
+            // Trier les résultats par l'ordre des sources
+            const sortedResults = results.sort((a, b) => {
+                const indexA = sources.indexOf(a.source);
+                const indexB = sources.indexOf(b.source);
+                return indexA - indexB;
+            });
+            
+            displaySortedResults(sortedResults);
+        })
+        .catch(() => {
+            // En cas d'erreur, afficher simplement en groupant par source
+            displaySortedResults(results);
+        });
+    
+    // Vérifier le statut aMule pour afficher/cacher les boutons
+    checkEmuleStatus();
+}
+
+function displaySortedResults(results) {
+    const container = document.getElementById('search-results');
+    
+    // Grouper par source
+    const grouped = {};
+    results.forEach(result => {
+        const source = result.source || 'autre';
+        if (!grouped[source]) {
+            grouped[source] = [];
+        }
+        grouped[source].push(result);
+    });
+    
+    // Ordre de priorité standard
+    const sourceOrder = ['ebdz', 'prowlarr'];
+    
+    let html = '';
+    
+    // Afficher en ordre de priorité
+    sourceOrder.forEach(source => {
+        if (!grouped[source] || grouped[source].length === 0) return;
         
-        return `
-            <div class="result-item">
-                <div class="result-title">
-                    ${escapeHtml(result.title)}
-                </div>
-                <div class="result-meta">
-                    ${result.source ? `<span>🔗 ${result.source}</span>` : ''}
-                    ${result.indexer ? `<span>${result.indexer}</span>` : ''}
-                    ${seeders ? `<span>${seeders}</span>` : ''}
-                    ${size ? `<span>💾 ${size}</span>` : ''}
-                </div>
-                <div class="result-actions">
-                    <button class="btn btn-primary" onclick="openDownloadModal('${escapeHtml(result.link)}', '${escapeHtml(currentSearchResults[0].title || '')}', '')">
-                        📥 Télécharger
+        const sourceResults = grouped[source];
+        const sourceTitle = source.toUpperCase();
+        const sourceBadge = source === 'ebdz' ? '📦 EBDZ' : '⚡ PROWLARR';
+        
+        html += `<div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; padding: 10px; background: ${source === 'ebdz' ? '#e3f2fd' : '#fff3e0'}; border-radius: 5px; color: ${source === 'ebdz' ? '#1976d2' : '#ff9800'};">
+                        ${sourceBadge}
+                    </h4>`;
+        
+        sourceResults.forEach((result, index) => {
+            const seeders = result.seeders ? `👥 ${result.seeders} seeders` : '';
+            const size = result.size ? `${(result.size / 1073741824).toFixed(2)} GB` : '';
+            
+            // Différencier les boutons selon le type de lien
+            let actionButtons = '';
+            
+            if (result.source === 'ebdz') {
+                // Pour ED2K, utiliser aMule
+                actionButtons = `
+                    <button class="btn btn-primary" onclick="addToEmule('${escapeHtml(result.link)}', this)" style="background: #8b5cf6;">
+                        ⬇️ Ajouter à aMule
                     </button>
+                `;
+            } else if (result.source === 'prowlarr') {
+                // Pour Prowlarr, utiliser qBittorrent
+                actionButtons = `
+                    <a href="${result.link}" target="_blank" class="btn btn-primary" style="text-decoration: none; background: #28a745;">
+                        📥 Télécharger torrent
+                    </a>
+                    <button class="btn btn-primary" onclick="addTorrentToQbittorrent('${escapeHtml(result.link)}', this)" style="background: #f5576c;">
+                        ⚡ qBittorrent
+                    </button>
+                `;
+            }
+            
+            html += `
+                <div class="result-item">
+                    <div class="result-title">
+                        ${escapeHtml(result.title)}
+                    </div>
+                    <div class="result-meta">
+                        ${result.indexer ? `<span>${result.indexer}</span>` : ''}
+                        ${seeders ? `<span>${seeders}</span>` : ''}
+                        ${size ? `<span>💾 ${size}</span>` : ''}
+                    </div>
+                    <div class="result-actions">
+                        ${actionButtons}
+                    </div>
                 </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        });
+        
+        html += '</div>';
+    });
+    
+    // Afficher les autres sources si elles existent
+    Object.keys(grouped).forEach(source => {
+        if (!sourceOrder.includes(source)) {
+            html += `<h4>${source.toUpperCase()}</h4>`;
+            grouped[source].forEach(result => {
+                html += `<div class="result-item">${escapeHtml(result.title)}</div>`;
+            });
+        }
+    });
+    
+    const container_el = document.getElementById('search-results');
+    if (container_el) {
+        container_el.innerHTML = html;
+    }
 }
 
 // ========== DOWNLOAD MODAL ==========
@@ -562,48 +773,108 @@ async function loadConfig() {
         const response = await fetch('/api/missing-monitor/config');
         const config = await response.json();
         
-        document.getElementById('config-enabled').checked = config.enabled || false;
-        document.getElementById('config-auto-check').checked = config.auto_check_enabled || false;
-        document.getElementById('config-interval').value = config.auto_check_interval || 60;
-        document.getElementById('config-interval-unit').value = config.auto_check_interval_unit || 'minutes';
-        document.getElementById('config-search').checked = config.search_enabled !== false;
-        document.getElementById('config-auto-download').checked = config.auto_download_enabled || false;
-        document.getElementById('config-client').value = config.preferred_client || 'qbittorrent';
+        // Vérifications de sécurité avant d'accéder aux éléments
+        const configEnabled = document.getElementById('config-enabled');
+        const configAutoCheck = document.getElementById('config-auto-check');
+        const configInterval = document.getElementById('config-interval');
+        const configIntervalUnit = document.getElementById('config-interval-unit');
+        const configClient = document.getElementById('config-client');
+        const configMonitorMissing = document.getElementById('config-monitor-missing');
+        const configMissingSearch = document.getElementById('config-missing-search');
+        const configMissingAutoDownload = document.getElementById('config-missing-auto-download');
+        const configMonitorNew = document.getElementById('config-monitor-new');
+        const configNewSearch = document.getElementById('config-new-search');
+        const configNewAutoDownload = document.getElementById('config-new-auto-download');
+        const configNautiljonCheck = document.getElementById('config-nautiljon-check');
+        
+        // Configuration générale
+        if (configEnabled) configEnabled.checked = config.enabled || false;
+        if (configAutoCheck) configAutoCheck.checked = config.auto_check_enabled || false;
+        if (configInterval) configInterval.value = config.auto_check_interval || 60;
+        if (configIntervalUnit) configIntervalUnit.value = config.auto_check_interval_unit || 'minutes';
+        if (configClient) configClient.value = config.preferred_client || 'qbittorrent';
         
         // Cocher les sources
         (config.search_sources || ['ebdz', 'prowlarr']).forEach(source => {
             const el = document.querySelector(`input[name="source"][value="${source}"]`);
             if (el) el.checked = true;
         });
-        
+
+        // Configuration des volumes manquants
+        const missingVolumeConfig = config.monitor_missing_volumes || {};
+        if (configMonitorMissing) configMonitorMissing.checked = missingVolumeConfig.enabled !== false;
+        if (configMissingSearch) configMissingSearch.checked = missingVolumeConfig.search_enabled !== false;
+        if (configMissingAutoDownload) configMissingAutoDownload.checked = missingVolumeConfig.auto_download_enabled || false;
+
+        // Configuration des nouveaux volumes
+        const newVolumeConfig = config.monitor_new_volumes || {};
+        if (configMonitorNew) configMonitorNew.checked = newVolumeConfig.enabled || false;
+        if (configNewSearch) configNewSearch.checked = newVolumeConfig.search_enabled !== false;
+        if (configNewAutoDownload) configNewAutoDownload.checked = newVolumeConfig.auto_download_enabled || false;
+        if (configNautiljonCheck) configNautiljonCheck.checked = newVolumeConfig.check_nautiljon_updates !== false;
+
+        // Mettre à jour l'affichage des sections
         updateAutoCheckUI();
+        updateNewVolumesUI();
     } catch (error) {
         console.error('Erreur chargement config:', error);
     }
 }
 
 function updateAutoCheckUI() {
-    const enabled = document.getElementById('config-auto-check').checked;
+    const enabled = document.getElementById('config-auto-check');
     const settings = document.getElementById('auto-check-settings');
-    settings.style.display = enabled ? 'block' : 'none';
+    if (enabled && settings) {
+        settings.style.display = enabled.checked ? 'block' : 'none';
+    }
+}
+
+function updateNewVolumesUI() {
+    const enabled = document.getElementById('config-monitor-new');
+    const settings = document.getElementById('new-volumes-settings');
+    if (enabled && settings) {
+        settings.style.display = enabled.checked ? 'block' : 'none';
+    }
 }
 
 async function saveConfig() {
-    const sources = Array.from(document.querySelectorAll('input[name="source"]:checked'))
-        .map(el => el.value);
-    
-    const config = {
-        enabled: document.getElementById('config-enabled').checked,
-        auto_check_enabled: document.getElementById('config-auto-check').checked,
-        auto_check_interval: parseInt(document.getElementById('config-interval').value) || 60,
-        auto_check_interval_unit: document.getElementById('config-interval-unit').value,
-        search_enabled: document.getElementById('config-search').checked,
-        search_sources: sources,
-        auto_download_enabled: document.getElementById('config-auto-download').checked,
-        preferred_client: document.getElementById('config-client').value
-    };
-    
     try {
+        const sources = Array.from(document.querySelectorAll('input[name="source"]:checked'))
+            .map(el => el.value);
+        
+        const configEnabled = document.getElementById('config-enabled');
+        const configAutoCheck = document.getElementById('config-auto-check');
+        const configInterval = document.getElementById('config-interval');
+        const configIntervalUnit = document.getElementById('config-interval-unit');
+        const configClient = document.getElementById('config-client');
+        const configMonitorMissing = document.getElementById('config-monitor-missing');
+        const configMissingSearch = document.getElementById('config-missing-search');
+        const configMissingAutoDownload = document.getElementById('config-missing-auto-download');
+        const configMonitorNew = document.getElementById('config-monitor-new');
+        const configNewSearch = document.getElementById('config-new-search');
+        const configNewAutoDownload = document.getElementById('config-new-auto-download');
+        const configNautiljonCheck = document.getElementById('config-nautiljon-check');
+
+        const config = {
+            enabled: configEnabled?.checked || false,
+            auto_check_enabled: configAutoCheck?.checked || false,
+            auto_check_interval: parseInt(configInterval?.value) || 60,
+            auto_check_interval_unit: configIntervalUnit?.value || 'minutes',
+            search_sources: sources,
+            preferred_client: configClient?.value || 'qbittorrent',
+            monitor_missing_volumes: {
+                enabled: configMonitorMissing?.checked !== false,
+                search_enabled: configMissingSearch?.checked !== false,
+                auto_download_enabled: configMissingAutoDownload?.checked || false
+            },
+            monitor_new_volumes: {
+                enabled: configMonitorNew?.checked || false,
+                search_enabled: configNewSearch?.checked !== false,
+                auto_download_enabled: configNewAutoDownload?.checked || false,
+                check_nautiljon_updates: configNautiljonCheck?.checked !== false
+            }
+        };
+        
         const response = await fetch('/api/missing-monitor/config', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -663,6 +934,17 @@ async function runManualCheck() {
 
 // ========== UTILITIES ==========
 
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
@@ -676,24 +958,112 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
+// ========== DOWNLOAD FUNCTIONS ==========
+
+async function addToEmule(link, button) {
+    const originalText = button.textContent;
+    button.textContent = '⏳ Envoi...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch('/api/emule/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({link: link})
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            button.textContent = '✓ Ajouté!';
+            button.style.background = '#28a745';
+            showToast('Lien ajouté à aMule', 'success');
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '';
+            }, 3000);
+        } else {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+    } catch (error) {
+        button.textContent = '✗ Erreur';
+        button.style.background = '#dc3545';
+        showToast('Erreur: ' + error.message, 'error');
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+            button.style.background = '';
+        }, 3000);
+    }
 }
 
-// Fermer modal en cliquant à l'extérieur
-window.addEventListener('click', function(event) {
-    const modal = document.getElementById('download-modal');
-    if (event.target === modal) {
-        closeDownloadModal();
+async function addTorrentToQbittorrent(torrentUrl, button) {
+    const originalText = button.textContent;
+    button.textContent = '⏳ Envoi...';
+    button.disabled = true;
+
+    try {
+        // Charger la config pour obtenir la catégorie par défaut
+        const configResponse = await fetch('/api/qbittorrent/config');
+        const config = await configResponse.json();
+        
+        const payload = {
+            torrent_url: torrentUrl
+        };
+        
+        // Ajouter la catégorie par défaut si elle est configurée
+        if (config.default_category) {
+            payload.category = config.default_category;
+        }
+        
+        const response = await fetch('/api/qbittorrent/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            button.textContent = '✓ Ajouté!';
+            button.style.background = '#10b981';
+            showToast('Torrent ajouté à qBittorrent', 'success');
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.background = '';
+            }, 3000);
+        } else {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+    } catch (error) {
+        button.textContent = '✗ Erreur';
+        button.style.background = '#dc3545';
+        showToast('Erreur: ' + error.message, 'error');
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+            button.style.background = '';
+        }, 3000);
     }
-});
+}
+
+async function checkEmuleStatus() {
+    try {
+        const response = await fetch('/api/emule/config');
+        const config = await response.json();
+        
+        const addButtons = document.querySelectorAll('button[onclick*="addToEmule"]');
+        addButtons.forEach(button => {
+            button.style.display = config.enabled ? 'inline-block' : 'none';
+        });
+    } catch (error) {
+        console.error('Erreur lors de la vérification du statut aMule:', error);
+    }
+}
+
+// ========== UTILITIES ==========
 
 // Maj perodique des stats
 setInterval(() => {

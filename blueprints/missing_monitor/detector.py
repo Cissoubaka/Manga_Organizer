@@ -41,9 +41,9 @@ class MissingVolumeDetector:
                 mm.auto_download_enabled
             FROM series s
             JOIN libraries l ON s.library_id = l.id
-            LEFT JOIN missing_volume_monitor mm ON s.id = mm.series_id
+            JOIN missing_volume_monitor mm ON s.id = mm.series_id
             WHERE s.missing_volumes != '[]'
-            AND (mm.enabled = 1 OR mm.id IS NULL)
+            AND mm.enabled = 1
             ORDER BY s.title
         ''')
         
@@ -67,6 +67,50 @@ class MissingVolumeDetector:
                     'search_sources': json.loads(row[11]) if row[11] else ['ebdz', 'prowlarr'],
                     'auto_download_enabled': row[12] if row[12] is not None else False
                 })
+        
+        conn.close()
+        return series_list
+    
+    def get_series_for_new_volume_check(self) -> List[Dict]:
+        """Récupère les séries en surveillance pour vérifier les nouveaux volumes
+        
+        Returns:
+            Liste des séries avec leurs infos actuelles (pas seulement les volumes manquants)
+        """
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Récupérer TOUTES les séries en surveillance (pas seulement celles avec volumes manquants)
+        cursor.execute('''
+            SELECT 
+                s.id,
+                s.title,
+                s.total_volumes,
+                s.nautiljon_total_volumes,
+                s.nautiljon_status,
+                l.name as library_name,
+                mnm.id as monitor_id,
+                mnm.enabled
+            FROM series s
+            JOIN libraries l ON s.library_id = l.id
+            JOIN missing_volume_monitor mnm ON s.id = mnm.series_id
+            WHERE mnm.enabled = 1
+            ORDER BY s.title
+        ''')
+        
+        series_list = []
+        for row in cursor.fetchall():
+            series_list.append({
+                'series_id': row[0],
+                'title': row[1],
+                'total_volumes': row[2],
+                'nautiljon_total_volumes': row[3],
+                'nautiljon_status': row[4],
+                'library_name': row[5],
+                'monitor_id': row[6],
+                'enabled': row[7]
+            })
         
         conn.close()
         return series_list

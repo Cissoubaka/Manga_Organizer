@@ -397,51 +397,14 @@ def add_torrent():
             payload['urls'] = torrent_url
             print(f"[qBittorrent Add] Magnet link détecté", file=sys.stderr)
         else:
-            # C'est potentiellement une URL de fichier torrent
-            # Télécharger le fichier localement puis l'envoyer
-            try:
-                print(f"[qBittorrent Add] Téléchargement du fichier torrent depuis {torrent_url}", file=sys.stderr)
-                
-                # Télécharger le fichier avec timeout
-                torrent_response = requests.get(torrent_url, timeout=30, verify=False)
-                
-                if torrent_response.status_code != 200:
-                    print(f"[qBittorrent Add] Erreur téléchargement: {torrent_response.status_code}", file=sys.stderr)
-                    return jsonify({
-                        'success': False,
-                        'error': f'Impossible de télécharger le fichier torrent ({torrent_response.status_code})'
-                    }), 400
-                
-                # Vérifier que le contenu est un fichier torrent valide
-                torrent_content = torrent_response.content
-                if len(torrent_content) == 0:
-                    return jsonify({
-                        'success': False,
-                        'error': 'Le fichier torrent téléchargé est vide'
-                    }), 400
-                
-                print(f"[qBittorrent Add] Fichier torrent téléchargé: {len(torrent_content)} octets", file=sys.stderr)
-                
-                # Envoyer le fichier torrent à qBittorrent
-                # Utiliser multipart/form-data pour envoyer le fichier binaire
-                files_to_send = {'torrents': ('torrent.torrent', torrent_content)}
-                
-            except requests.exceptions.Timeout:
-                return jsonify({
-                    'success': False,
-                    'error': 'Timeout: impossible de télécharger le fichier torrent'
-                }), 500
-            except requests.exceptions.ConnectionError:
-                return jsonify({
-                    'success': False,
-                    'error': 'Impossible de télécharger le fichier torrent depuis l\'URL fournie'
-                }), 500
-            except Exception as e:
-                print(f"[qBittorrent Add] Erreur téléchargement: {str(e)}", file=sys.stderr)
-                return jsonify({
-                    'success': False,
-                    'error': f'Erreur téléchargement du torrent: {str(e)}'
-                }), 500
+            # C'est une URL de fichier torrent
+            # Essayer d'abord de l'envoyer directement à qBittorrent
+            # Si ça échoue, télécharger le fichier
+            
+            # Essai 1: Envoyer directement comme URL (qBittorrent va le télécharger)
+            payload['urls'] = torrent_url
+            print(f"[qBittorrent Add] URL de fichier torrent détectée", file=sys.stderr)
+            print(f"[qBittorrent Add] Envoi direct à qBittorrent (sans pré-téléchargement)", file=sys.stderr)
         
         # Ajouter la catégorie si fournie
         category = data.get('category', '').strip()

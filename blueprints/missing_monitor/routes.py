@@ -55,7 +55,23 @@ def get_default_monitor_config():
         'auto_check_enabled': False,
         'auto_check_interval': 60,
         'auto_check_interval_unit': 'minutes',
-        'search_enabled': True,
+        'monitor_missing_volumes': {
+            'enabled': True,
+            'search_enabled': True,
+            'auto_download_enabled': False,
+            'search_sources': ['ebdz', 'prowlarr'],
+            'check_interval': 12,  # Par défaut 12 heures
+            'check_interval_unit': 'hours'  # Par défaut en heures
+        },
+        'monitor_new_volumes': {
+            'enabled': False,
+            'search_enabled': True,
+            'auto_download_enabled': False,
+            'check_nautiljon_updates': True,
+            'search_sources': ['ebdz', 'prowlarr'],
+            'check_interval': 6,  # Par défaut 6 heures
+            'check_interval_unit': 'hours'  # Par défaut en heures
+        },
         'search_sources': ['ebdz', 'prowlarr'],
         'auto_download_enabled': False,
         'preferred_client': 'qbittorrent'
@@ -185,6 +201,7 @@ def get_library_series(library_id):
                 s.title,
                 s.total_volumes as total_local,
                 s.missing_volumes,
+                s.tags,
                 COALESCE(s.nautiljon_status, 'Inconnu') as nautiljon_status,
                 COALESCE(mm.enabled, 0) as enabled,
                 mm.search_sources,
@@ -221,20 +238,59 @@ def monitor_config():
             data = request.get_json()
             config = load_monitor_config()
             
-            # Mettre à jour les paramètres
+            # Mettre à jour les paramètres généraux
             config['enabled'] = data.get('enabled', False)
             config['auto_check_enabled'] = data.get('auto_check_enabled', False)
             config['auto_check_interval'] = int(data.get('auto_check_interval', 60))
             config['auto_check_interval_unit'] = data.get('auto_check_interval_unit', 'minutes')
-            config['search_enabled'] = data.get('search_enabled', True)
             config['search_sources'] = data.get('search_sources', ['ebdz', 'prowlarr'])
-            config['auto_download_enabled'] = data.get('auto_download_enabled', False)
             config['preferred_client'] = data.get('preferred_client', 'qbittorrent')
             
+            # Mettre à jour la configuration des volumes manquants
+            missing_config = data.get('monitor_missing_volumes', {})
+            config['monitor_missing_volumes'] = {
+                'enabled': missing_config.get('enabled', True),
+                'search_enabled': missing_config.get('search_enabled', True),
+                'auto_download_enabled': missing_config.get('auto_download_enabled', False),
+                'search_sources': missing_config.get('search_sources', ['ebdz', 'prowlarr']),
+                'check_interval': int(missing_config.get('check_interval', 12)),
+                'check_interval_unit': missing_config.get('check_interval_unit', 'hours')
+            }
+            
+            # Mettre à jour la configuration des nouveaux volumes
+            new_config = data.get('monitor_new_volumes', {})
+            config['monitor_new_volumes'] = {
+                'enabled': new_config.get('enabled', False),
+                'search_enabled': new_config.get('search_enabled', True),
+                'auto_download_enabled': new_config.get('auto_download_enabled', False),
+                'check_nautiljon_updates': new_config.get('check_nautiljon_updates', True),
+                'search_sources': new_config.get('search_sources', ['ebdz', 'prowlarr']),
+                'check_interval': int(new_config.get('check_interval', 6)),
+                'check_interval_unit': new_config.get('check_interval_unit', 'hours')
+            }
+            
             if save_monitor_config(config):
-                # Mettre à jour le scheduler
+                # Mettre à jour le scheduler avec les jobs séparés
                 scheduler = MissingVolumeScheduler()
-                if config['auto_check_enabled']:
+                
+                # Gérer le job pour les volumes manquants
+                if config.get('monitor_missing_volumes', {}).get('enabled', True):
+                    missing_interval = config['monitor_missing_volumes'].get('check_interval', 12)
+                    missing_unit = config['monitor_missing_volumes'].get('check_interval_unit', 'hours')
+                    scheduler.add_missing_volume_job(missing_interval, missing_unit)
+                else:
+                    scheduler.remove_missing_volume_job()
+                
+                # Gérer le job pour les nouveaux volumes
+                if config.get('monitor_new_volumes', {}).get('enabled', False):
+                    new_interval = config['monitor_new_volumes'].get('check_interval', 6)
+                    new_unit = config['monitor_new_volumes'].get('check_interval_unit', 'hours')
+                    scheduler.add_new_volume_job(new_interval, new_unit)
+                else:
+                    scheduler.remove_new_volume_job()
+                
+                # Mantenir la compatibilité avec l'ancien paramètre auto_check_enabled (optionnel)
+                if config.get('auto_check_enabled'):
                     scheduler.add_monitor_job(
                         config['auto_check_interval'],
                         config['auto_check_interval_unit']
@@ -378,7 +434,7 @@ def trigger_download():
 
 @missing_monitor_bp.route('/run-check', methods=['POST'])
 def run_monitor_check():
-    """Exécute une vérification manuelle"""
+    """Exécute une vérification manuelle des volumes manquants"""
     
     try:
         data = request.get_json() or {}
@@ -393,6 +449,32 @@ def run_monitor_check():
         stats = monitor_manager.run_missing_volume_check(
             search_enabled=search_enabled,
             download_enabled=download_enabled
+        )
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@missing_monitor_bp.route('/run-check-new-volumes', methods=['POST'])
+def run_new_volume_check():
+    """Exécute une vérification manuelle des nouveaux volumes"""
+    
+    try:
+        data = request.get_json() or {}
+        
+        auto_download = data.get('auto_download', False)
+        
+        # Initialiser le gestionnaire
+        monitor_manager.initialize()
+        
+        # Exécuter la vérification
+        stats = monitor_manager.run_new_volume_check(
+            auto_download_enabled=auto_download
         )
         
         return jsonify({
@@ -420,6 +502,36 @@ def get_monitor_stats():
             'monitored_series': total_series,
             'total_missing_volumes': total_missing,
             'recent_downloads': downloads
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@missing_monitor_bp.route('/performance', methods=['GET'])
+def get_performance_stats():
+    """Récupère les statistiques de performance du monitoring"""
+    
+    try:
+        searcher = get_searcher()
+        
+        # Récupérer les stats du cache et du throttler
+        cache_stats = searcher._cache.stats() if hasattr(searcher, '_cache') else {}
+        
+        # Info sur le throttler
+        throttler_info = {
+            'requests_per_minute': searcher._throttler.requests_per_minute if hasattr(searcher, '_throttler') else 30,
+            'min_interval_seconds': searcher._throttler.min_interval if hasattr(searcher, '_throttler') else 2.0
+        }
+        
+        return jsonify({
+            'success': True,
+            'cache': cache_stats,
+            'throttler': throttler_info,
+            'description': {
+                'cache': 'Les résultats de recherche sont mis en cache pour éviter les requêtes répétées',
+                'throttler': 'La fréquence des requêtes Prowlarr est limitée pour éviter les surcharges'
+            }
         })
     
     except Exception as e:

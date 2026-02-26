@@ -23,7 +23,7 @@ class MissingVolumeDownloader:
         """Envoie un torrent au client de téléchargement
         
         Args:
-            torrent_link: Lien du torrent ou magnet URI
+            torrent_link: Lien du torrent ou magnet URI ou ED2K
             title: Titre du manga
             volume_num: Numéro du volume
             client: Client à utiliser ('qbittorrent', 'amule') ou auto-détection
@@ -37,7 +37,12 @@ class MissingVolumeDownloader:
         
         # Auto-détection du client si non spécifié
         if not client:
-            client = self._get_default_client()
+            # Déterminer le client selon le type de lien
+            if torrent_link.startswith('ed2k://'):
+                client = 'amule'
+            else:
+                # magnet:, http://, https://, etc. → qBittorrent
+                client = 'qbittorrent'
         
         if client not in self.clients:
             return False, f"Client inconnu: {client}"
@@ -70,125 +75,104 @@ class MissingVolumeDownloader:
     
     def _download_to_qbittorrent(self, torrent_link: str, title: str, 
                                 volume_num: int, category: str = None) -> Tuple[bool, str]:
-        """Envoie à qBittorrent"""
+        """Envoie à qBittorrent en utilisant l'endpoint /api/qbittorrent/add"""
         try:
-            config_file = current_app.config.get('QBITTORRENT_CONFIG_FILE')
-            if not config_file:
-                return False, "qBittorrent non configuré"
+            import sys
             
-            try:
-                with open(config_file, 'r') as f:
-                    config = json.load(f)
-            except:
-                return False, "Config qBittorrent invalide"
-            
-            if not config.get('enabled'):
-                return False, "qBittorrent désactivé"
-            
-            url = config.get('url', 'http://127.0.0.1')
-            port = config.get('port', 8080)
-            username = config.get('username')
-            password = config.get('password')
-            
-            # Déchiffrer le mot de passe
-            if password:
-                from encryption import decrypt
-                decrypted = decrypt(password)
-                if decrypted:
-                    password = decrypted
-            
-            base_url = f"{url}:{port}"
-            
-            # Authentification
-            session = requests.Session()
-            
-            if username and password:
-                auth_payload = {
-                    'username': username,
-                    'password': password
-                }
-                auth_response = session.post(
-                    f"{base_url}/api/v2/auth/login",
-                    data=auth_payload,
-                    timeout=10
-                )
-                
-                if auth_response.status_code != 200:
-                    return False, "Authentification qBittorrent échouée"
-            
-            # Ajouter le torrent
-            download_payload = {
-                'urls': torrent_link,
-                'savepath': config.get('download_path', ''),
-            }
-            
-            # Ajouter catégorie si spécifiée
+            # Charger la catégorie par défaut si non fournie
             if not category:
+                from ..qbittorrent.routes import load_qbittorrent_config
+                config = load_qbittorrent_config()
                 category = config.get('default_category', '')
             
-            if category:
-                download_payload['category'] = category
+            # Utiliser l'endpoint qBittorrent existant qui fonctionne déjà
+            payload = {
+                'torrent_url': torrent_link,
+            }
             
-            response = session.post(
-                f"{base_url}/api/v2/torrents/add",
-                data=download_payload,
-                timeout=10
+            # Ajouter la catégorie si configurée
+            if category:
+                payload['category'] = category
+            
+            print(f"[qBittorrent Download] Envoi à qBittorrent: {title} Vol {volume_num}", file=sys.stderr)
+            print(f"[qBittorrent Download] URL: {torrent_link[:80]}...", file=sys.stderr)
+            if category:
+                print(f"[qBittorrent Download] Catégorie: {category}", file=sys.stderr)
+            
+            response = requests.post(
+                'http://127.0.0.1:5000/api/qbittorrent/add',
+                json=payload,
+                timeout=30
             )
             
-            if response.status_code in [200, 202]:
-                msg = f"✅ {title} Vol {volume_num} envoyé à qBittorrent"
-                self._log_download(title, volume_num, 'qbittorrent', True, msg)
-                return True, msg
+            print(f"[qBittorrent Download] Réponse HTTP: {response.status_code}", file=sys.stderr)
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"[qBittorrent Download] Résultat: {result}", file=sys.stderr)
+                
+                if result.get('success'):
+                    msg = f"✅ {title} Vol {volume_num} envoyé à qBittorrent"
+                    self._log_download(title, volume_num, 'qbittorrent', True, msg)
+                    print(f"[qBittorrent Download] ✅ Succès", file=sys.stderr)
+                    return True, msg
+                else:
+                    error_msg = result.get('error', 'Erreur inconnue')
+                    msg = f"Erreur qBittorrent: {error_msg}"
+                    self._log_download(title, volume_num, 'qbittorrent', False, msg)
+                    print(f"[qBittorrent Download] ❌ {error_msg}", file=sys.stderr)
+                    return False, msg
             else:
-                error = response.text or "Code erreur inconnu"
-                msg = f"Erreur qBittorrent: {error}"
+                msg = f"Erreur qBittorrent: HTTP {response.status_code}"
                 self._log_download(title, volume_num, 'qbittorrent', False, msg)
+                print(f"[qBittorrent Download] ❌ HTTP {response.status_code}: {response.text[:200]}", file=sys.stderr)
                 return False, msg
         
         except Exception as e:
+            import sys
             msg = f"Erreur connexion qBittorrent: {str(e)}"
             self._log_download(title, volume_num, 'qbittorrent', False, msg)
+            print(f"[qBittorrent Download] ❌ Exception: {str(e)}", file=sys.stderr)
             return False, msg
+
     
     def _download_to_amule(self, torrent_link: str, title: str, 
                           volume_num: int, category: str = None) -> Tuple[bool, str]:
-        """Envoie à aMule/eMule"""
+        """Envoie à aMule/eMule en utilisant l'endpoint /api/emule/add"""
         try:
-            config = current_app.config.get('EMULE_CONFIG', {})
+            # Utiliser l'endpoint eMule existant qui fonctionne déjà
+            payload = {
+                'link': torrent_link,
+            }
             
-            if not config.get('enabled'):
-                return False, "aMule désactivé"
+            # Si on a une catégorie, on peut la passer (bien que aMule ne l'utilise pas)
+            if category:
+                payload['category'] = category
             
-            host = config.get('host', '127.0.0.1')
-            port = config.get('ec_port', 4712)
-            password = config.get('password', '')
+            response = requests.post(
+                'http://127.0.0.1:5000/api/emule/add',
+                json=payload,
+                timeout=30
+            )
             
-            # aMule utilise l'ED2K ou les URLs magnet
-            # Pour les magnets/torrents, il faut soit:
-            # 1. Convertir en ED2K (nécessite une API)
-            # 2. Utiliser directement si aMule supporte les magnets
-            
-            # Tentative directe avec aMule API (si disponible)
-            try:
-                import socket
-                
-                # Note: L'intégration aMule complète nécessiterait
-                # des commandes EC (eMule Client) spécifiques
-                # Pour l'instant, retourner un succès simulé
-                # (l'implémentation complète dépend de la version d'aMule)
-                
-                # Alternative: utiliser un fichier .ed2k
-                msg = f"⚠️  {title} Vol {volume_num} - Lien envoyé en attente de conversion ED2K"
-                self._log_download(title, volume_num, 'amule', True, msg)
-                return True, msg
-            
-            except Exception as e:
-                msg = f"Erreur connexion aMule: {str(e)}"
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    msg = f"✅ {title} Vol {volume_num} envoyé à aMule"
+                    self._log_download(title, volume_num, 'amule', True, msg)
+                    return True, msg
+                else:
+                    error_msg = result.get('error', 'Erreur inconnue')
+                    msg = f"Erreur aMule: {error_msg}"
+                    self._log_download(title, volume_num, 'amule', False, msg)
+                    return False, msg
+            else:
+                msg = f"Erreur aMule: HTTP {response.status_code}"
                 self._log_download(title, volume_num, 'amule', False, msg)
                 return False, msg
         
         except Exception as e:
-            msg = f"Erreur aMule: {str(e)}"
+            msg = f"Erreur connexion aMule: {str(e)}"
             self._log_download(title, volume_num, 'amule', False, msg)
             return False, msg
     

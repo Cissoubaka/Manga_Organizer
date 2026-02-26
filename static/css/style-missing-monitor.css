@@ -178,6 +178,24 @@
     transform: translateY(-2px);
 }
 
+/* Boutons rapides de filtrage */
+.btn-small {
+    padding: 8px 16px;
+    font-size: 12px;
+    border-radius: 4px;
+    opacity: 0.6;
+    transition: all 0.3s ease;
+}
+
+.btn-small.active {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.btn-small:hover {
+    opacity: 1;
+}
+
 /* Section */
 .section {
     margin-bottom: 30px;

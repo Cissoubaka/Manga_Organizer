@@ -38,9 +38,9 @@
                 <button class="tab-button" data-tab="history">
                     <span class="emoji">📜</span> Historique
                 </button>
-                <button class="tab-button" data-tab="config">
+                <a href="/settings#monitoring" class="tab-button" style="display: inline-flex; align-items: center; gap: 5px; text-decoration: none; color: inherit;">
                     <span class="emoji">⚙️</span> Configuration
-                </button>
+                </a>
             </div>
 
             <!-- Tab Content -->
@@ -103,6 +103,20 @@
                     <!-- Séries Section -->
                     <div class="section">
                         <h2><span class="emoji">📖</span> Séries en Surveillance</h2>
+                        
+                        <!-- Filtres rapides -->
+                        <div class="filter-group" style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-small" id="filter-all-series" onclick="filterByMonitoredStatus('all')" style="flex: none;">
+                                📋 Toutes
+                            </button>
+                            <button class="btn btn-success btn-small" id="filter-monitored" onclick="filterByMonitoredStatus('monitored')" style="flex: none;">
+                                ✅ Suivies
+                            </button>
+                            <button class="btn btn-danger btn-small" id="filter-not-monitored" onclick="filterByMonitoredStatus('not-monitored')" style="flex: none;">
+                                ❌ Non suivies
+                            </button>
+                        </div>
+                        
                         <div class="filter-group">
                             <input type="text" id="series-search" placeholder="🔍 Rechercher une série..." class="search-input">
                             <select id="series-status-filter" class="filter-select">
@@ -120,42 +134,79 @@
 
                 <!-- Search Tab -->
                 <div class="tab-pane" id="search">
-                    <div class="search-form">
-                        <div class="form-group">
-                            <label>📖 Titre du Manga</label>
-                            <input type="text" id="search-title" placeholder="Ex: One Piece" class="form-control">
-                        </div>
-
-                        <div class="form-group">
-                            <label>📚 Numéro de Volume</label>
-                            <input type="number" id="search-volume" placeholder="Ex: 1" min="1" class="form-control">
-                        </div>
-
-                        <div class="form-group">
-                            <label>🔗 Sources</label>
-                            <div class="checkbox-group">
-                                <label>
-                                    <input type="checkbox" name="search-source" value="ebdz" checked> EBDZ
+                    <div class="section">
+                        <h2><span class="emoji">🔍</span> Recherche Manuelle de Volumes</h2>
+                        <p style="color: #6b7280; margin-bottom: 20px;">Recherchez manuellement un volume spécifique sur différentes sources</p>
+                        
+                        <div class="search-form" style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <!-- Title Input -->
+                            <div style="margin-bottom: 15px;">
+                                <label for="search-title" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                    Titre du Manga
                                 </label>
-                                <label>
-                                    <input type="checkbox" name="search-source" value="prowlarr" checked> Prowlarr
+                                <input 
+                                    type="text" 
+                                    id="search-title" 
+                                    placeholder="Ex: Dragon Ball, One Piece, etc."
+                                    class="search-input"
+                                    style="width: 100%;"
+                                >
+                            </div>
+                            
+                            <!-- Volume Input -->
+                            <div style="margin-bottom: 15px;">
+                                <label for="search-volume" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                                    Numéro de Volume
                                 </label>
+                                <input 
+                                    type="number" 
+                                    id="search-volume" 
+                                    placeholder="Ex: 5"
+                                    min="1"
+                                    class="search-input"
+                                    style="width: 100%;"
+                                >
+                            </div>
+                            
+                            <!-- Sources Selection -->
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 10px; font-weight: 600;">
+                                    Sources de Recherche
+                                </label>
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                        <input type="checkbox" name="search-source" value="ebdz" checked>
+                                        <span>📚 EBDZ</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                        <input type="checkbox" name="search-source" value="prowlarr" checked>
+                                        <span>🔗 Prowlarr</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Search Button -->
+                            <button class="btn btn-primary" onclick="searchVolume()" style="width: 100%; padding: 12px;">
+                                <span class="emoji">🔍</span> Rechercher
+                            </button>
+                        </div>
+                        
+                        <!-- Search Results -->
+                        <div id="search-results-section" style="display: none;">
+                            <h3 style="margin-bottom: 15px;">Résultats de Recherche</h3>
+                            <div id="search-results" class="results-list">
+                                <!-- Les résultats seront affichés ici -->
                             </div>
                         </div>
-
-                        <button class="btn btn-primary" onclick="searchVolume()">
-                            <span class="emoji">🔍</span> Rechercher
-                        </button>
-                    </div>
-
-                    <!-- Search Results -->
-                    <div class="section" id="search-results-section" style="display: none;">
-                        <h2><span class="emoji">📋</span> Résultats de Recherche</h2>
-                        <div class="results-list" id="search-results">
+                        
+                        <div id="no-search-yet" style="text-align: center; padding: 40px; color: #9ca3af;">
+                            <p style="font-size: 48px; margin-bottom: 10px;">🔍</p>
+                            <p>Entrez un titre et un numéro de volume pour commencer la recherche</p>
                         </div>
                     </div>
                 </div>
 
+                <!-- Search Tab -->
                 <!-- History Tab -->
                 <div class="tab-pane" id="history">
                     <div class="filter-group">
@@ -171,108 +222,60 @@
                     </div>
                 </div>
 
-                <!-- Configuration Tab -->
-                <div class="tab-pane" id="config">
-                    <div class="config-section">
-                        <h2><span class="emoji">🔧</span> Configuration Générale</h2>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="config-enabled" onchange="saveConfig()">
-                                <span class="emoji">✅</span> Activer la surveillance
-                            </label>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="config-auto-check" onchange="updateAutoCheckUI()">
-                                <span class="emoji">🔄</span> Vérification automatique
-                            </label>
-                        </div>
-
-                        <div id="auto-check-settings" style="display: none; padding-left: 20px;">
-                            <div class="form-group">
-                                <label>Intervalle</label>
-                                <div class="input-group">
-                                    <input type="number" id="config-interval" min="1" value="60" class="form-control" style="max-width: 150px;">
-                                    <select id="config-interval-unit" class="form-control">
-                                        <option value="minutes">Minutes</option>
-                                        <option value="hours">Heures</option>
-                                        <option value="days">Jours</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="config-search" checked onchange="saveConfig()">
-                                <span class="emoji">🔍</span> Recherche automatique
-                            </label>
-                        </div>
-
-                        <div class="form-group">
-                            <label>🔗 Sources de Recherche</label>
-                            <div class="checkbox-group">
-                                <label>
-                                    <input type="checkbox" name="source" value="ebdz" checked onchange="saveConfig()"> EBDZ
-                                </label>
-                                <label>
-                                    <input type="checkbox" name="source" value="prowlarr" checked onchange="saveConfig()"> Prowlarr
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="config-auto-download" onchange="saveConfig()">
-                                <span class="emoji">📥</span> Téléchargement automatique
-                            </label>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Client Préféré</label>
-                            <select id="config-client" class="form-control" onchange="saveConfig()">
-                                <option value="qbittorrent">qBittorrent</option>
-                                <option value="amule">aMule</option>
-                            </select>
-                        </div>
-
-                        <button class="btn btn-primary" onclick="saveConfig()">
-                            <span class="emoji">💾</span> Sauvegarder Configuration
-                        </button>
-                    </div>
-                </div>
             </div>
         </main>
-    </div>
-
-    <!-- Modal pour détails téléchargement -->
-    <div class="modal" id="download-modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeDownloadModal()">&times;</span>
-            <h2>Envoyer Téléchargement</h2>
-            <div class="form-group">
-                <label>Lien Torrent/Magnet</label>
-                <textarea id="modal-link" class="form-control" rows="3" placeholder="Coller le lien..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>Titre</label>
-                <input type="text" id="modal-title" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label>Volume</label>
-                <input type="number" id="modal-volume" class="form-control" readonly>
-            </div>
-            <button class="btn btn-primary" onclick="confirmDownload()">
-                📥 Envoyer
-            </button>
-        </div>
     </div>
 
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
+    <!-- Download Modal -->
+    <div id="download-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📥 Télécharger le Volume</h2>
+                <button class="modal-close" onclick="closeDownloadModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label for="modal-title" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                        Titre
+                    </label>
+                    <input type="text" id="modal-title" class="search-input" style="width: 100%;" readonly>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="modal-volume" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                        Volume
+                    </label>
+                    <input type="text" id="modal-volume" class="search-input" style="width: 100%;" readonly>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="modal-link" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                        Lien Magnet/Torrent
+                    </label>
+                    <input type="text" id="modal-link" class="search-input" style="width: 100%;" readonly>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="modal-client" style="display: block; margin-bottom: 5px; font-weight: 600;">
+                        Client de Téléchargement
+                    </label>
+                    <select id="modal-client" class="filter-select" style="width: 100%;">
+                        <option value="">Auto-détection</option>
+                        <option value="qbittorrent">qBittorrent</option>
+                        <option value="transmission">Transmission</option>
+                        <option value="deluge">Deluge</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDownloadModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="confirmDownload()">📥 Télécharger</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/missing-monitor.js') }}"></script>
-</body>
-</html>
+</body></html>

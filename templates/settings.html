@@ -25,19 +25,22 @@
         <div class="content">
             <!-- Navigation par onglets -->
             <div class="settings-tabs">
-                <button class="tab-button active" onclick="switchTab('amule')">
+                <button class="tab-button active" data-tab="amule" onclick="switchTab('amule')">
                     🌐 aMule / eMule
                 </button>
-                <button class="tab-button" onclick="switchTab('ebdz')">
+                <button class="tab-button" data-tab="ebdz" onclick="switchTab('ebdz')">
                     🕸️ ebdz.net
                 </button>
-                <button class="tab-button" onclick="switchTab('prowlarr')">
+                <button class="tab-button" data-tab="prowlarr" onclick="switchTab('prowlarr')">
                     🔍 Prowlarr
                 </button>
-                <button class="tab-button" onclick="switchTab('qbittorrent')">
+                <button class="tab-button" data-tab="qbittorrent" onclick="switchTab('qbittorrent')">
                     ⚡ qBittorrent
                 </button>
-                <button class="tab-button" onclick="switchTab('badges')">
+                <button class="tab-button" data-tab="monitoring" onclick="switchTab('monitoring')">
+                    📊 Surveillance
+                </button>
+                <button class="tab-button" data-tab="badges" onclick="switchTab('badges')">
                     🎨 Badges
                 </button>
                 <button class="tab-button" onclick="switchTab('general')" style="opacity: 0.5; cursor: not-allowed;" disabled>
@@ -594,7 +597,7 @@
                                 <div class="badge-config-item">
                                     <div class="badge-label">
                                         <strong>✅ Finie</strong>
-                                        <small>Série complete (volumes locaux = Nautiljon)</small>
+                                        <small>Série complete (volumes locaux = Nautiljon) et terminée sur Nautiljon</small>
                                     </div>
                                     <div class="color-picker-group">
                                         <input type="color" id="badgeColorComplete" value="#10b981">
@@ -606,7 +609,7 @@
                                 <div class="badge-config-item">
                                     <div class="badge-label">
                                         <strong>🔄 En cours</strong>
-                                        <small>Volumes ne correspondent pas</small>
+                                        <small>Volumes ne correspondent pas ou série en cours sur Nautiljon</small>
                                     </div>
                                     <div class="color-picker-group">
                                         <input type="color" id="badgeColorOngoing" value="#ef4444">
@@ -651,25 +654,231 @@
                     </div>
                 </div>
 
-                <!-- Onglet Général (futur) -->
-                <div class="tab-content" id="tab-general">
+                <!-- Onglet Surveillance -->
+                <div class="tab-content" id="tab-monitoring">
                     <div class="settings-section">
                         <div class="section-header">
-                            <h2>🔧 Paramètres généraux</h2>
-                            <p class="section-description">À venir prochainement...</p>
+                            <h2>📊 Surveillance des Volumes</h2>
+                            <p class="section-description">
+                                Configurez la surveillance automatique des volumes manquants et nouveaux volumes
+                            </p>
                         </div>
+
+                        <!-- Surveillance des Volumes Manquants -->
+                        <div class="settings-card">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <span style="font-size: 24px;">⚠️</span>
+                                <h3 style="margin: 0; color: #333;">Volumes Manquants</h3>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" id="settingsMonitorMissing" checked>
+                                <label for="settingsMonitorMissing">
+                                    <strong>Activer la surveillance des volumes manquants</strong>
+                                    <span class="help-text">Détecte automatiquement les volumes manquants dans vos séries</span>
+                                </label>
+                            </div>
+
+                            <div id="missingVolumesSettings" style="padding-left: 20px;">
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="settingsMissingSearch" checked>
+                                    <label for="settingsMissingSearch">
+                                        <strong>Recherche automatique</strong>
+                                        <span class="help-text">Recherche les volumes manquants</span>
+                                    </label>
+                                </div>
+
+                                <!-- Priorisation des sources -->
+                                <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">🎯 Priorisation des sources</label>
+                                    <small class="help-text" style="display: block; margin-bottom: 15px;">Choisissez l'ordre pour afficher les résultats de recherche</small>
+                                    
+                                    <div id="missingSourcesTooltip" style="background: #f0f4ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                                        <div style="font-size: 13px; color: #555; line-height: 1.6;">
+                                            <div style="margin-bottom: 8px;">
+                                                <strong style="color: #333;">📌 Source 1ère (priority)</strong><br>
+                                                <span id="missingSources1st" style="background: #e3f2fd; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">-</span>
+                                            </div>
+                                            <div>
+                                                <strong style="color: #333;">📌 Source 2nde</strong><br>
+                                                <span id="missingSources2nd" style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn" onclick="swapMissingSources()" style="flex: 1; background: #ff9800;">
+                                            🔄 Inverser l'ordre
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="missingSources" style="padding-left: 30px; margin-bottom: 15px; margin-top: 15px;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Sources activées</label>
+                                    <div class="form-group checkbox-group">
+                                        <input type="checkbox" id="settingsMissingEbdz" checked>
+                                        <label for="settingsMissingEbdz">EBDZ</label>
+                                    </div>
+                                    <div class="form-group checkbox-group">
+                                        <input type="checkbox" id="settingsMissingProwlarr" checked>
+                                        <label for="settingsMissingProwlarr">Prowlarr</label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="settingsMissingAutoDownload">
+                                    <label for="settingsMissingAutoDownload">
+                                        <strong>Téléchargement automatique</strong>
+                                        <span class="help-text">Envoie automatiquement au client les volumes trouvés</span>
+                                    </label>
+                                </div>
+
+                                <!-- Fréquence de vérification -->
+                                <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Fréquence de vérification</label>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="missingCheckInterval">Intervalle</label>
+                                            <input type="number" id="missingCheckInterval" value="1" min="1" max="999" placeholder="1" onchange="updateNextMissingCheck()" onkeyup="updateNextMissingCheck()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="missingCheckUnit">Unité</label>
+                                            <select id="missingCheckUnit" class="form-select" onchange="updateNextMissingCheck()">
+                                                <option value="hours">Heures</option>
+                                                <option value="days">Jours</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="nextMissingCheck" style="margin-top: 10px; padding: 10px; background: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 3px; color: #2e7d32; font-size: 14px;">
+                                        Prochaine vérification: -
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions" style="margin-top: 20px;">
+                                <button class="btn btn-success" onclick="saveMonitoringConfig()">
+                                    💾 Sauvegarder
+                                </button>
+                                <a href="/missing-monitor" class="btn" style="background: #667eea;">
+                                    📊 Aller à la surveillance
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Surveillance des Nouveaux Volumes -->
+                        <div class="settings-card" style="margin-top: 30px;">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <span style="font-size: 24px;">✨</span>
+                                <h3 style="margin: 0; color: #333;">Nouveaux Volumes</h3>
+                            </div>
+
+                            <div class="form-group checkbox-group">
+                                <input type="checkbox" id="settingsMonitorNew">
+                                <label for="settingsMonitorNew">
+                                    <strong>Activer la surveillance des nouveaux volumes</strong>
+                                    <span class="help-text">Détecte automatiquement les nouveaux volumes publiés de vos séries</span>
+                                </label>
+                            </div>
+
+                            <div id="newVolumesSettings" style="padding-left: 20px; display: none;">
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="settingsNewSearch" checked>
+                                    <label for="settingsNewSearch">
+                                        <strong>Recherche automatique</strong>
+                                        <span class="help-text">Recherche les nouveaux volumes</span>
+                                    </label>
+                                </div>
+
+                                <!-- Priorisation des sources -->
+                                <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">🎯 Priorisation des sources</label>
+                                    <small class="help-text" style="display: block; margin-bottom: 15px;">Choisissez l'ordre pour afficher les résultats de recherche</small>
+                                    
+                                    <div id="newSourcesTooltip" style="background: #f0f4ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                                        <div style="font-size: 13px; color: #555; line-height: 1.6;">
+                                            <div style="margin-bottom: 8px;">
+                                                <strong style="color: #333;">📌 Source 1ère (priority)</strong><br>
+                                                <span id="newSources1st" style="background: #e3f2fd; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">-</span>
+                                            </div>
+                                            <div>
+                                                <strong style="color: #333;">📌 Source 2nde</strong><br>
+                                                <span id="newSources2nd" style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px;">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn" onclick="swapNewSources()" style="flex: 1; background: #ff9800;">
+                                            🔄 Inverser l'ordre
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="newSources" style="padding-left: 30px; margin-bottom: 15px; margin-top: 15px;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Sources activées</label>
+                                    <div class="form-group checkbox-group">
+                                        <input type="checkbox" id="settingsNewEbdz" checked>
+                                        <label for="settingsNewEbdz">EBDZ</label>
+                                    </div>
+                                    <div class="form-group checkbox-group">
+                                        <input type="checkbox" id="settingsNewProwlarr" checked>
+                                        <label for="settingsNewProwlarr">Prowlarr</label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="settingsNewAutoDownload">
+                                    <label for="settingsNewAutoDownload">
+                                        <strong>Téléchargement automatique</strong>
+                                        <span class="help-text">Envoie automatiquement au client les nouveaux volumes trouvés</span>
+                                    </label>
+                                </div>
+
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="settingsNautiljonCheck" checked>
+                                    <label for="settingsNautiljonCheck">
+                                        <strong>Vérifier Nautiljon</strong>
+                                        <span class="help-text">Utilise Nautiljon pour détecter les nouveaux volumes</span>
+                                    </label>
+                                </div>
+
+                                <!-- Fréquence de vérification -->
+                                <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Fréquence de vérification</label>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="newCheckInterval">Intervalle</label>
+                                            <input type="number" id="newCheckInterval" value="1" min="1" max="999" placeholder="1" onchange="updateNextNewCheck()" onkeyup="updateNextNewCheck()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="newCheckUnit">Unité</label>
+                                            <select id="newCheckUnit" class="form-select" onchange="updateNextNewCheck()">
+                                                <option value="hours">Heures</option>
+                                                <option value="days">Jours</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div id="nextNewCheck" style="margin-top: 10px; padding: 10px; background: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 3px; color: #2e7d32; font-size: 14px;">
+                                        Prochaine vérification: -
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions" style="margin-top: 20px;">
+                                <button class="btn btn-success" onclick="saveMonitoringConfig()">
+                                    💾 Sauvegarder
+                                </button>
+                                <a href="/missing-monitor" class="btn" style="background: #667eea;">
+                                    📊 Aller à la surveillance
+                                </a>
+                            </div>
+                        </div>
+
+                        <div id="monitoringMessage" class="message" style="margin-top: 20px;"></div>
                     </div>
                 </div>
 
-                <!-- Onglet Notifications (futur) -->
-                <div class="tab-content" id="tab-notifications">
-                    <div class="settings-section">
-                        <div class="section-header">
-                            <h2>🔔 Notifications</h2>
-                            <p class="section-description">À venir prochainement...</p>
-                        </div>
-                    </div>
-                </div>
+                
             </div>
         </div>
     </div>

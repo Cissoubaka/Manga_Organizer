@@ -547,22 +547,18 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
-    // Ajouter la classe active au bouton cliqué
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active');
-    } else {
-        // Fallback : chercher le bouton par son onclick
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            if (btn.getAttribute('onclick').includes(`'${tabName}'`)) {
-                btn.classList.add('active');
-            }
-        });
+    // Ajouter la classe active au bouton cliqué en utilisant data-tab
+    const activeBtn = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
     }
     
     // Afficher le contenu de l'onglet
     const tabElement = document.getElementById('tab-' + tabName);
     if (tabElement) {
         tabElement.classList.add('active');
+        // Mettre à jour l'URL avec le hash
+        window.history.replaceState(null, null, '#' + tabName);
     }
     
     // Charger les données spécifiques à chaque onglet
@@ -574,6 +570,8 @@ function switchTab(tabName) {
         loadProwlarrSettings();
     } else if (tabName === 'badges') {
         initBadgeColorPickers();
+    } else if (tabName === 'monitoring') {
+        loadMonitoringConfig();
     }
 }
 
@@ -924,39 +922,343 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
+    // Vérifier si une tab est spécifiée dans l'URL (ex: #monitoring)
+    if (window.location.hash) {
+        const tabName = window.location.hash.substring(1); // Enlever le '#'
+        console.log('Hash détecté au load:', tabName);
+        switchTab(tabName);
+        console.log('switchTab exécuté pour:', tabName);
+    } else {
+        console.log('Pas de hash dans l\'URL');
+    }
+    
     try {
         loadSettings();
     } catch (e) {
         console.error('Erreur loadSettings:', e);
     }
-    
-    try {
-        loadEbdzConfig();
-    } catch (e) {
-        console.error('Erreur loadEbdzConfig:', e);
-    }
+});
 
-    try {
-        loadAutoScrapeConfig();
-    } catch (e) {
-        console.error('Erreur loadAutoScrapeConfig:', e);
-    }
-    
-    try {
-        loadProwlarrSettings();
-    } catch (e) {
-        console.error('Erreur loadProwlarrSettings:', e);
-    }
-    
-    try {
-        loadQbittorrentSettings();
-    } catch (e) {
-        console.error('Erreur loadQbittorrentSettings:', e);
-    }
-    
-    try {
-        initBadgeColorPickers();
-    } catch (e) {
-        console.error('Erreur initBadgeColorPickers:', e);
+// Gérer les changements de hash (navigation sans rechargement)
+window.addEventListener('hashchange', () => {
+    if (window.location.hash) {
+        const tabName = window.location.hash.substring(1);
+        console.log('Hash changé vers:', tabName);
+        switchTab(tabName);
     }
 });
+
+// ===== SURVEILLANCE =====
+
+async function loadMonitoringConfig() {
+    try {
+        const response = await fetch('/api/missing-monitor/config');
+        const config = await response.json();
+        
+        // Configuration des volumes manquants
+        const missingConfig = config.monitor_missing_volumes || {};
+        
+        const settingsMonitorMissing = document.getElementById('settingsMonitorMissing');
+        const settingsMissingSearch = document.getElementById('settingsMissingSearch');
+        const settingsMissingAutoDownload = document.getElementById('settingsMissingAutoDownload');
+        const settingsMissingEbdz = document.getElementById('settingsMissingEbdz');
+        const settingsMissingProwlarr = document.getElementById('settingsMissingProwlarr');
+        const missingCheckInterval = document.getElementById('missingCheckInterval');
+        const missingCheckUnit = document.getElementById('missingCheckUnit');
+        
+        if (settingsMonitorMissing) settingsMonitorMissing.checked = missingConfig.enabled !== false;
+        if (settingsMissingSearch) settingsMissingSearch.checked = missingConfig.search_enabled !== false;
+        if (settingsMissingAutoDownload) settingsMissingAutoDownload.checked = missingConfig.auto_download_enabled || false;
+        
+        // Charger les fréquences pour les volumes manquants
+        if (missingCheckInterval) missingCheckInterval.value = missingConfig.check_interval || 12;
+        if (missingCheckUnit) missingCheckUnit.value = missingConfig.check_interval_unit || 'hours';
+        
+        // Charger les sources de recherche AVEC l'ordre de priorité
+        const missingSources = missingConfig.search_sources || ['ebdz', 'prowlarr'];
+        if (settingsMissingEbdz) settingsMissingEbdz.checked = missingSources.includes('ebdz');
+        if (settingsMissingProwlarr) settingsMissingProwlarr.checked = missingSources.includes('prowlarr');
+        
+        // Afficher l'ordre de priorité
+        const missingSources1stEl = document.getElementById('missingSources1st');
+        const missingSources2ndEl = document.getElementById('missingSources2nd');
+        if (missingSources1stEl && missingSources.length > 0) {
+            missingSources1stEl.textContent = missingSources[0].toUpperCase();
+        }
+        if (missingSources2ndEl && missingSources.length > 1) {
+            missingSources2ndEl.textContent = missingSources[1].toUpperCase();
+        }
+
+        // Configuration des nouveaux volumes
+        const newConfig = config.monitor_new_volumes || {};
+        
+        const settingsMonitorNew = document.getElementById('settingsMonitorNew');
+        const settingsNewSearch = document.getElementById('settingsNewSearch');
+        const settingsNewAutoDownload = document.getElementById('settingsNewAutoDownload');
+        const settingsNautiljonCheck = document.getElementById('settingsNautiljonCheck');
+        const settingsNewEbdz = document.getElementById('settingsNewEbdz');
+        const settingsNewProwlarr = document.getElementById('settingsNewProwlarr');
+        const newVolumesSettings = document.getElementById('newVolumesSettings');
+        const newCheckInterval = document.getElementById('newCheckInterval');
+        const newCheckUnit = document.getElementById('newCheckUnit');
+        
+        if (settingsMonitorNew) settingsMonitorNew.checked = newConfig.enabled || false;
+        if (settingsNewSearch) settingsNewSearch.checked = newConfig.search_enabled !== false;
+        if (settingsNewAutoDownload) settingsNewAutoDownload.checked = newConfig.auto_download_enabled || false;
+        if (settingsNautiljonCheck) settingsNautiljonCheck.checked = newConfig.check_nautiljon_updates !== false;
+        
+        // Charger les fréquences pour les nouveaux volumes
+        if (newCheckInterval) newCheckInterval.value = newConfig.check_interval || 6;
+        if (newCheckUnit) newCheckUnit.value = newConfig.check_interval_unit || 'hours';
+        
+        // Charger les sources de recherche AVEC l'ordre de priorité
+        const newSources = newConfig.search_sources || ['ebdz', 'prowlarr'];
+        if (settingsNewEbdz) settingsNewEbdz.checked = newSources.includes('ebdz');
+        if (settingsNewProwlarr) settingsNewProwlarr.checked = newSources.includes('prowlarr');
+        
+        // Afficher l'ordre de priorité
+        const newSources1stEl = document.getElementById('newSources1st');
+        const newSources2ndEl = document.getElementById('newSources2nd');
+        if (newSources1stEl && newSources.length > 0) {
+            newSources1stEl.textContent = newSources[0].toUpperCase();
+        }
+        if (newSources2ndEl && newSources.length > 1) {
+            newSources2ndEl.textContent = newSources[1].toUpperCase();
+        }
+
+        // Ajouter les événements pour afficher/masquer les sections
+        if (settingsMonitorNew) {
+            settingsMonitorNew.addEventListener('change', function() {
+                if (newVolumesSettings) {
+                    newVolumesSettings.style.display = this.checked ? 'block' : 'none';
+                }
+            });
+        }
+
+        // Initialiser l'affichage
+        if (newVolumesSettings && settingsMonitorNew) {
+            newVolumesSettings.style.display = settingsMonitorNew.checked ? 'block' : 'none';
+        }
+        
+        // Calculer et afficher la prochaine vérification
+        updateNextMissingCheck();
+        updateNextNewCheck();
+    } catch (error) {
+        console.error('Erreur chargement config surveillance:', error);
+    }
+}
+
+async function saveMonitoringConfig() {
+    try {
+        // Vérifier que tous les éléments existent avant d'accéder à leurs valeurs
+        const settingsMonitorMissing = document.getElementById('settingsMonitorMissing');
+        const settingsMissingSearch = document.getElementById('settingsMissingSearch');
+        const settingsMissingAutoDownload = document.getElementById('settingsMissingAutoDownload');
+        const settingsMissingEbdz = document.getElementById('settingsMissingEbdz');
+        const settingsMissingProwlarr = document.getElementById('settingsMissingProwlarr');
+        const missingCheckInterval = document.getElementById('missingCheckInterval');
+        const missingCheckUnit = document.getElementById('missingCheckUnit');
+        
+        const settingsMonitorNew = document.getElementById('settingsMonitorNew');
+        const settingsNewSearch = document.getElementById('settingsNewSearch');
+        const settingsNewAutoDownload = document.getElementById('settingsNewAutoDownload');
+        const settingsNautiljonCheck = document.getElementById('settingsNautiljonCheck');
+        const settingsNewEbdz = document.getElementById('settingsNewEbdz');
+        const settingsNewProwlarr = document.getElementById('settingsNewProwlarr');
+        const newCheckInterval = document.getElementById('newCheckInterval');
+        const newCheckUnit = document.getElementById('newCheckUnit');
+        
+        if (!settingsMonitorMissing || !settingsMissingSearch || !settingsMissingAutoDownload) {
+            console.error('Éléments manquants pour la section volumes manquants');
+            return;
+        }
+        
+        if (!settingsMonitorNew || !settingsNewSearch || !settingsNewAutoDownload || !settingsNautiljonCheck) {
+            console.error('Éléments manquants pour la section nouveaux volumes');
+            return;
+        }
+        
+        // Construire la liste des sources pour les volumes manquants (respecter l'ordre)
+        let missingSources = [];
+        const missingSources1st = document.getElementById('missingSources1st')?.textContent || '';
+        const missingSources2nd = document.getElementById('missingSources2nd')?.textContent || '';
+        
+        if (missingSources1st && missingSources1st !== '-') {
+            missingSources.push(missingSources1st.toLowerCase());
+        }
+        if (missingSources2nd && missingSources2nd !== '-') {
+            missingSources.push(missingSources2nd.toLowerCase());
+        }
+        
+        // Fallback: si pas de priorisation, utiliser les checkboxes
+        if (missingSources.length === 0) {
+            if (settingsMissingEbdz && settingsMissingEbdz.checked) missingSources.push('ebdz');
+            if (settingsMissingProwlarr && settingsMissingProwlarr.checked) missingSources.push('prowlarr');
+        }
+        
+        // Construire la liste des sources pour les nouveaux volumes (respecter l'ordre)
+        let newSources = [];
+        const newSources1st = document.getElementById('newSources1st')?.textContent || '';
+        const newSources2nd = document.getElementById('newSources2nd')?.textContent || '';
+        
+        if (newSources1st && newSources1st !== '-') {
+            newSources.push(newSources1st.toLowerCase());
+        }
+        if (newSources2nd && newSources2nd !== '-') {
+            newSources.push(newSources2nd.toLowerCase());
+        }
+        
+        // Fallback: si pas de priorisation, utiliser les checkboxes
+        if (newSources.length === 0) {
+            if (settingsNewEbdz && settingsNewEbdz.checked) newSources.push('ebdz');
+            if (settingsNewProwlarr && settingsNewProwlarr.checked) newSources.push('prowlarr');
+        }
+        
+        // Récupérer les fréquences
+        const missingInterval = parseInt(missingCheckInterval?.value || 12) || 12;
+        const missingUnit = missingCheckUnit?.value || 'hours';
+        const newInterval = parseInt(newCheckInterval?.value || 6) || 6;
+        const newUnit = newCheckUnit?.value || 'hours';
+        
+        const config = {
+            monitor_missing_volumes: {
+                enabled: settingsMonitorMissing.checked,
+                search_enabled: settingsMissingSearch.checked,
+                auto_download_enabled: settingsMissingAutoDownload.checked,
+                search_sources: missingSources,
+                check_interval: missingInterval,
+                check_interval_unit: missingUnit
+            },
+            monitor_new_volumes: {
+                enabled: settingsMonitorNew.checked,
+                search_enabled: settingsNewSearch.checked,
+                auto_download_enabled: settingsNewAutoDownload.checked,
+                check_nautiljon_updates: settingsNautiljonCheck.checked,
+                search_sources: newSources,
+                check_interval: newInterval,
+                check_interval_unit: newUnit
+            }
+        };
+
+        const response = await fetch('/api/missing-monitor/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showSettingsMessage('monitoringMessage', '✅ Configuration de surveillance sauvegardée avec succès !', 'success');
+        } else {
+            showSettingsMessage('monitoringMessage', '❌ Erreur: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erreur sauvegarde config surveillance:', error);
+        showSettingsMessage('monitoringMessage', '❌ Erreur de connexion', 'error');
+    }
+}
+
+function showSettingsMessage(elementId, message, type) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.className = 'message ' + type;
+        element.textContent = message;
+        element.style.display = 'block';
+        
+        // Masquer après 5 secondes
+        if (type === 'success') {
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+        }
+    }
+}
+
+function swapMissingSources() {
+    const sources1st = document.getElementById('missingSources1st');
+    const sources2nd = document.getElementById('missingSources2nd');
+    
+    if (sources1st && sources2nd) {
+        const temp = sources1st.textContent;
+        sources1st.textContent = sources2nd.textContent;
+        sources2nd.textContent = temp;
+    }
+}
+
+function swapNewSources() {
+    const sources1st = document.getElementById('newSources1st');
+    const sources2nd = document.getElementById('newSources2nd');
+    
+    if (sources1st && sources2nd) {
+        const temp = sources1st.textContent;
+        sources1st.textContent = sources2nd.textContent;
+        sources2nd.textContent = temp;
+    }
+}
+
+function updateNextMissingCheck() {
+    const interval = parseInt(document.getElementById('missingCheckInterval')?.value || 12) || 12;
+    const unit = document.getElementById('missingCheckUnit')?.value || 'hours';
+    
+    const nextDate = new Date();
+    if (unit === 'hours') {
+        nextDate.setHours(nextDate.getHours() + interval);
+    } else if (unit === 'days') {
+        nextDate.setDate(nextDate.getDate() + interval);
+    }
+    
+    const displayText = formatNextCheck(nextDate);
+    const elem = document.getElementById('nextMissingCheck');
+    if (elem) {
+        elem.textContent = displayText;
+    }
+}
+
+function updateNextNewCheck() {
+    const interval = parseInt(document.getElementById('newCheckInterval')?.value || 6) || 6;
+    const unit = document.getElementById('newCheckUnit')?.value || 'hours';
+    
+    const nextDate = new Date();
+    if (unit === 'hours') {
+        nextDate.setHours(nextDate.getHours() + interval);
+    } else if (unit === 'days') {
+        nextDate.setDate(nextDate.getDate() + interval);
+    }
+    
+    const displayText = formatNextCheck(nextDate);
+    const elem = document.getElementById('nextNewCheck');
+    if (elem) {
+        elem.textContent = displayText;
+    }
+}
+
+function formatNextCheck(date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = checkDate - today;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    const dayOptions = { weekday: 'long', month: 'long', day: 'numeric' };
+    const timeOptions = { hour: '2-digit', minute: '2-digit' };
+    
+    const dayName = date.toLocaleDateString('fr-FR', dayOptions);
+    const timeName = date.toLocaleTimeString('fr-FR', timeOptions);
+    
+    let prefix = '';
+    if (diffDays === 0) {
+        prefix = 'Aujourd\'hui';
+    } else if (diffDays === 1) {
+        prefix = 'Demain';
+    } else if (diffDays > 1 && diffDays <= 7) {
+        prefix = `Dans ${diffDays} jours`;
+    } else {
+        return `Prochaine vérification: ${dayName} à ${timeName}`;
+    }
+    
+    return `Prochaine vérification: ${prefix} à ${timeName}`;
+}

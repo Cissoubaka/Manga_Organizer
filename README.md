@@ -13,7 +13,7 @@ Manga Organizer est une application web Flask permettant de gérer efficacement 
 - Support qBittorrent
 - ajout de nouvelle série
 - recherche globale de série sur l'index
-- monitoring des volumes manquants/nouveaux en WIP (Ne pas activer)
+- monitoring des volumes manquants/nouveaux à tester
 
 ---
 
@@ -176,7 +176,7 @@ AMULE_HOST=192.168.1.234
    - Cliquer "Scrap Selected Forums" pour indexer les liens ED2K
    - Les données seront stockées dans la base `ebdz.db`
 
-### Configuration Prowlarr (optionnel)
+### Configuration Prowlarr
 
 1. **Accédez à** → `Settings` → `Prowlarr Configuration`
 
@@ -184,6 +184,16 @@ AMULE_HOST=192.168.1.234
    - **URL** : Adresse de Prowlarr (ex: http://192.168.1.100:9696)
    - **API Key** : Votre clé API Prowlarr
    - **Indexers** : Sélectionner les indexeurs à utiliser
+
+### Configuration Qbittorrent
+
+1. **Accédez à** → `Settings` → `Qbittorrent Configuration`
+
+2. **Paramètres** :
+   - **URL** : Adresse de Qbittorrent (ex: http://192.168.1.100:9696)
+   - **Port** : configurer votre port
+   - **login/mdp** : Votre login /mdp de connection à Qbittorrent
+
 
 ---
 

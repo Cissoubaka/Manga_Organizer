@@ -82,6 +82,36 @@ function displaySeries(series) {
     }).join('');
 }
 
+// Fonction utilitaire pour déterminer le statut d'une série (pour le filtre)
+function getSeriesStatus(series) {
+    const hasNautiljonInfo = series.nautiljon_total_volumes;
+    const hasMissingVolumes = series.missing_volumes && series.missing_volumes.length > 0;
+    const isNautiljonComplete = series.nautiljon_status && (
+        series.nautiljon_status.toLowerCase().includes('terminé') || 
+        series.nautiljon_status.toLowerCase().includes('termin')
+    );
+    const isNautiljonOngoing = series.nautiljon_status && 
+        series.nautiljon_status.toLowerCase().includes('en cours');
+    const volumesMatch = hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes;
+    const volumesDontMatch = hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes;
+    
+    // Pour le FILTRE, seule "Finie" (vraiment finie, sans manquants) est "completed"
+    // Toutes les autres (Manquant, Incomplet, En cours) sont "ongoing"
+    
+    // "Finie" : volumes locaux = volumes Nautiljon ET série terminée sur Nautiljon ET pas de manquants
+    if (volumesMatch && isNautiljonComplete && !hasMissingVolumes) {
+        return 'completed';
+    }
+    
+    // Tout le reste est "ongoing"
+    if (hasMissingVolumes || volumesDontMatch || isNautiljonOngoing) {
+        return 'ongoing';
+    }
+    
+    // Si pas d'info Nautiljon, considérer comme "unknown"
+    return 'unknown';
+}
+
 // Fonction pour calculer le badge d'une série
 function calculateSeriesBadge(series) {
     // Récupérer les couleurs depuis le localStorage ou utiliser les défauts
@@ -98,16 +128,20 @@ function calculateSeriesBadge(series) {
         series.nautiljon_status.toLowerCase().includes('terminé') || 
         series.nautiljon_status.toLowerCase().includes('termin')
     );
+    const isNautiljonOngoing = series.nautiljon_status && 
+        series.nautiljon_status.toLowerCase().includes('en cours');
+    const volumesMatch = hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes;
+    const volumesDontMatch = hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes;
     
-    // Logique des badges
-    // 1. "Finie" : volumes locaux = volumes Nautiljon
-    if (hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes && !hasMissingVolumes) {
-        return `<span class="series-badge" style="background: ${colors.complete}; color: white;">✅ Finie</span>`;
-    }
-    
+    // Logique des badges - IMPORTANT: Checker "Manquant" AVANT "Finie" pour donner la priorité aux volumes manquants
     // 2. "Manquant" : série terminée sur Nautiljon ET volumes manquants
     if (isNautiljonComplete && hasMissingVolumes) {
         return `<span class="series-badge" style="background: ${colors.missing}; color: white;">📚 Manquant</span>`;
+    }
+    
+    // 1. "Finie" : volumes locaux = volumes Nautiljon ET série terminée sur Nautiljon
+    if (volumesMatch && isNautiljonComplete) {
+        return `<span class="series-badge" style="background: ${colors.complete}; color: white;">✅ Finie</span>`;
     }
     
     // 3. "Incomplet" : volumes manquants ET série pas terminée sur Nautiljon
@@ -115,8 +149,8 @@ function calculateSeriesBadge(series) {
         return `<span class="series-badge" style="background: ${colors.incomplete}; color: white;">⚠️ Incomplet</span>`;
     }
     
-    // 4. "En cours" : volumes ne correspondent pas
-    if (hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes) {
+    // 4. "En cours" : (volumes ne correspondent pas) OU (série en cours sur Nautiljon)
+    if (volumesDontMatch || isNautiljonOngoing) {
         return `<span class="series-badge" style="background: ${colors.ongoing}; color: white;">🔄 En cours</span>`;
     }
     
@@ -138,16 +172,11 @@ function filterSeries() {
         filtered = filtered.filter(s => !s.nautiljon_url);
     }
     
+    // Utiliser la fonction getSeriesStatus pour cohérence avec les badges
     if (seriesStatusFilter === 'completed') {
-        filtered = filtered.filter(s => 
-            s.nautiljon_status && 
-            (s.nautiljon_status.toLowerCase().includes('terminé') || s.nautiljon_status.toLowerCase().includes('termin'))
-        );
+        filtered = filtered.filter(s => getSeriesStatus(s) === 'completed');
     } else if (seriesStatusFilter === 'ongoing') {
-        filtered = filtered.filter(s => 
-            s.nautiljon_status && 
-            s.nautiljon_status.toLowerCase().includes('cours')
-        );
+        filtered = filtered.filter(s => getSeriesStatus(s) === 'ongoing');
     }
     
     displaySeries(filtered);

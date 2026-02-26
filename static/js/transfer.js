@@ -156,16 +156,20 @@ function calculateSeriesBadge(series) {
         series.nautiljon_status.toLowerCase().includes('terminé') || 
         series.nautiljon_status.toLowerCase().includes('termin')
     );
+    const isNautiljonOngoing = series.nautiljon_status && 
+        series.nautiljon_status.toLowerCase().includes('en cours');
+    const volumesMatch = hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes;
+    const volumesDontMatch = hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes;
     
-    // Logique des badges
-    // 1. "Finie" : volumes locaux = volumes Nautiljon
-    if (hasNautiljonInfo && series.total_volumes === series.nautiljon_total_volumes && !hasMissingVolumes) {
-        return 'complete';
-    }
-    
+    // Logique des badges - IMPORTANT: Checker "Manquant" AVANT "Finie" pour donner la priorité aux volumes manquants
     // 2. "Manquant" : série terminée sur Nautiljon ET volumes manquants
     if (isNautiljonComplete && hasMissingVolumes) {
         return 'missing';
+    }
+    
+    // 1. "Finie" : volumes locaux = volumes Nautiljon ET série terminée sur Nautiljon ET pas de manquants
+    if (volumesMatch && isNautiljonComplete && !hasMissingVolumes) {
+        return 'complete';
     }
     
     // 3. "Incomplet" : volumes manquants ET série pas terminée sur Nautiljon
@@ -173,8 +177,8 @@ function calculateSeriesBadge(series) {
         return 'incomplete';
     }
     
-    // 4. "En cours" : volumes ne correspondent pas
-    if (hasNautiljonInfo && series.total_volumes !== series.nautiljon_total_volumes) {
+    // 4. "En cours" : (volumes ne correspondent pas) OU (série en cours sur Nautiljon)
+    if (volumesDontMatch || isNautiljonOngoing) {
         return 'ongoing';
     }
     

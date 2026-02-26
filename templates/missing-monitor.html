@@ -4,26 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surveillance des Volumes Manquants - Manga Organizer</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-missing-monitor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <header>
-            <div class="header-content">
-                <div class="header-left">
-                    <h1>📚 Surveillance des Volumes Manquants</h1>
-                    <p class="subtitle">Gérez la surveillance automatique des volumes manquants de vos séries</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link active">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <!-- Main Content -->
-        <main class="content">
+        <div class="main-wrapper">
+            <!-- Header -->
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>📊 Surveillance des Volumes Manquants</h1>
+                        <p class="subtitle">Gérez la surveillance automatique des volumes manquants de vos séries</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Main Content -->
+                <main class="content">
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab-button active" data-tab="overview">
@@ -275,7 +286,11 @@
                 <button class="btn btn-primary" onclick="confirmDownload()">📥 Télécharger</button>
             </div>
         </div>
+                </main>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/missing-monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body></html>

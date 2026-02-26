@@ -5,25 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recherche de liens ed2k</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-search.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-	    <header>
-            <div class="header-content">
-                <div class="header-left">
-                   <h1>🔍 Recherche ED2K</h1>
-            <p class="subtitle">Base de données de liens EmuleBDZ</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/discover" class="btn-back" style="background: #06b6d4; border-color: #06b6d4;">🎯 Découvrir</a>
-                    <a href="/nautiljon" class="btn-back" style="background: #667eea; border-color: #667eea;">🌊 Nautiljon</a>
-                    <a href="/settings" class="btn-back" style="background: #6c757d; border-color: #6c757d;">⚙️ Configuration</a>
-                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link active">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <div class="search-box">
+        <div class="main-wrapper">
+	    <header>
+                <div class="header-content">
+                    <div class="header-left">
+                       <h1>🔍 Recherche ED2K</h1>
+                <p class="subtitle">Base de données de liens EmuleBDZ</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
             <div class="search-input-group">
                 <input 
                     type="text" 
@@ -92,8 +101,12 @@
         </div>
 
         <div id="results"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/search.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

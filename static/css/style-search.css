@@ -11,10 +11,11 @@ body {
     padding: 20px;
 }
 
-.container {
+/* Conteneur - géré par style.css pour le nouveau layout avec sidebar */
+/* .container {
     max-width: 1200px;
     margin: 0 auto;
-}
+} */
 
 .header {
     text-align: center;

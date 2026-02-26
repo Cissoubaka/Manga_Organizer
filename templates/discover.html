@@ -4,24 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Découvrir et ajouter des séries</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-discover.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-left">
-                    <h1>🎯 Découvrir et ajouter des séries</h1>
-                    <p class="subtitle">Cherchez, sélectionnez une bibliothèque, puis trouvez des sources</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link active">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <div class="discover-container">
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>🎯 Découvrir et ajouter des séries</h1>
+                        <p class="subtitle">Cherchez, sélectionnez une bibliothèque, puis trouvez des sources</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
             <!-- ÉTAPE 1: Recherche sur Nautiljon -->
             <section class="step" id="step-1">
                 <div class="step-header">
@@ -140,10 +151,13 @@
 
                 <div id="sources-error" class="error-box" style="display:none;"></div>
             </section>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/search.js') }}"></script>
     <script src="{{ url_for('static', filename='js/discover.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

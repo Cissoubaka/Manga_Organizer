@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌊 Nautiljon - Enrichissement de Séries</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-nautiljon.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .nautiljon-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -157,16 +157,30 @@
 </head>
 <body>
     <div class="container">
-        <div class="nautiljon-header">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h1>🌊 Enrichissement Nautiljon</h1>
-                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Enrichissez vos séries avec les infos de Nautiljon.com</p>
-                </div>
-                <a id="back-button" href="/" class="btn" style="background: #6c757d; white-space: nowrap;">← Retour à l'accueil</a>
-            </div>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link active">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
         </div>
 
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>🌊 Nautiljon - Enrichissement de Séries</h1>
+                        <p class="subtitle">Recherchez et synchronisez les informations des mangas</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
         <div class="tabs">
             <button class="tab active" onclick="switchTab('single')">🔍 Enrichir une Série</button>
             <button class="tab" onclick="switchTab('batch')">⚡ Enrichissement par Lot</button>
@@ -773,6 +787,11 @@
             
             loadLibrariesForSingle();
         });
+                </div>
+            </div>
+        </div>
+    </div>
     </script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

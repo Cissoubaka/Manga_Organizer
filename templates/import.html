@@ -8,20 +8,30 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-left">
-                    <h1>📥 Import de Mangas</h1>
-                    <p class="subtitle">Scannez et importez vos nouveaux mangas</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
-                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link active">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <div class="content">
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>📥 Import de Mangas</h1>
+                        <p class="subtitle">Scannez et importez vos nouveaux mangas</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
             <!-- Sélection du répertoire d'import -->
             <div class="import-section">
                 <h2>Répertoire d'import</h2>
@@ -109,8 +119,12 @@
                 </div>
             </div>
         </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/import.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

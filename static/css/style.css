@@ -12,24 +12,112 @@ body {
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 95%;
+    width: 100%;
+    min-height: 100vh;
     margin: 0 auto;
     background: white;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+}
+
+@supports (width: 100vw) {
+    @media (min-width: 1920px) {
+        .container {
+            max-width: 90%;
+        }
+    }
+}
+
+.main-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-top: 100px;
+}
+
+/* Navigation verticale à gauche */
+.sidebar-nav {
+    width: 180px;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    padding: 15px 0;
+    margin-top: 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-right: 2px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+@media (min-width: 1920px) {
+    .sidebar-nav {
+        width: 200px;
+        padding: 20px 0;
+    }
+
+    .content-wrapper {
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    .content {
+        padding: 50px 60px;
+    }
+}
+
+.sidebar-nav a {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+    transition: all 0.3s;
+    border-left: 4px solid transparent;
+    white-space: nowrap;
+}
+
+.sidebar-nav a:hover {
+    background: rgba(255,255,255,0.1);
+    border-left-color: #10b981;
+}
+
+.sidebar-nav a.active {
+    background: rgba(255,255,255,0.15);
+    border-left-color: #10b981;
+}
+
+.content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 40px 30px;
-    text-align: center;
+    padding: 30px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    height: 100px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
 }
 
 h1 {
-    font-size: 3em;
-    margin-bottom: 10px;
+    font-size: 2em;
+    margin-bottom: 5px;
 }
 
 h2 {
@@ -38,28 +126,35 @@ h2 {
 
 .subtitle {
     opacity: 0.9;
-    font-size: 1.2em;
+    font-size: 0.95em;
+    margin: 0;
 }
 
 .header-content {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
-    flex-wrap: wrap;
     gap: 20px;
+    flex: 1;
+}
+
+.header-left {
+    flex: 1;
 }
 
 .header-left h1 {
-    font-size: 2.5em;
-    margin-bottom: 5px;
+    font-size: 2em;
+    margin-bottom: 3px;
 }
 
 .header-left .subtitle {
-    font-size: 1em;
+    font-size: 0.9em;
 }
 
 .content {
-    padding: 40px 30px;
+    padding: 40px;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .top-actions {
@@ -658,13 +753,63 @@ h2 {
     display: block;
 }
 
+@media (max-width: 1200px) {
+    .sidebar-nav {
+        width: 160px;
+        padding: 15px 0;
+    }
+
+    .sidebar-nav a {
+        padding: 12px 15px;
+        font-size: 14px;
+    }
+
+    header {
+        height: 100px;
+    }
+
+    .header-left h1 {
+        font-size: 1.8em;
+    }
+
+    .content {
+        padding: 35px;
+    }
+}
+
 @media (max-width: 768px) {
+    .main-wrapper {
+        flex-direction: column;
+    }
+
+    .sidebar-nav {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 2px solid #e5e7eb;
+        padding: 10px 15px;
+        gap: 5px;
+        margin-top: 0;
+    }
+
+    .sidebar-nav a {
+        padding: 10px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    header {
+        height: 100px;
+    }
+
     h1 {
         font-size: 2em;
     }
 
     .header-left h1 {
-        font-size: 1.8em;
+        font-size: 1.5em;
     }
     
     .libraries-grid,
@@ -678,6 +823,10 @@ h2 {
     
     .stat-value {
         font-size: 2em;
+    }
+
+    .content {
+        padding: 20px;
     }
 }
 

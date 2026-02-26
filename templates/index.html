@@ -8,54 +8,51 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-left">
-                    <h1>📚 Mes Bibliothèques Manga</h1>
-                    <p class="subtitle">Gérez vos collections de mangas</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
-                    <a href="/missing-monitor" class="btn" style="background: #f59e0b;">📚 Surveillance</a>
-                    <a href="/settings" class="btn" style="background: #6c757d;">⚙️ Configuration</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link active">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <div class="content">
-            <div class="top-actions">
-                <h2>Bibliothèques</h2>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn" onclick="window.location.href='/discover'" style="background: #06b6d4;">
-                        🎯 Découvrir et ajouter
-                    </button>
-					<button class="btn" onclick="window.location.href='/search'" style="background: #f59e0b;">
-                        🔍 Recherche ED2K
-                    </button>
-                    <button class="btn" onclick="window.location.href='/import'" style="background: #f59e0b;">
-                        📥 Import de mangas
-                    </button>
-                    <button class="btn" onclick="window.location.href='/transfer'" style="background: #8b5cf6;">
-                        ↔️ Transfert de séries
-                    </button>
-                    <button class="btn btn-success" onclick="openCreateModal()">
-                        ➕ Créer une bibliothèque
-                    </button>
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>📚 Mes Bibliothèques Manga</h1>
+                        <p class="subtitle">Gérez vos collections de mangas</p>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            <!-- Barre de recherche globale -->
-            <div style="margin-bottom: 30px;">
-                <input type="text" id="global-search" placeholder="🔍 Rechercher une série dans toutes les bibliothèques..." 
-                       onkeyup="searchSeriesGlobal()" 
-                       style="width: 100%; padding: 12px 15px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 1em;">
-                <div id="search-results-container" style="margin-top: 15px;"></div>
-            </div>
+            <div class="content-wrapper">
+                <div class="content">
 
-            <div id="libraries-container">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Chargement des bibliothèques...</p>
+                    <!-- Barre de recherche globale -->
+                    <div style="margin-bottom: 30px;">
+                        <input type="text" id="global-search" placeholder="🔍 Rechercher une série dans toutes les bibliothèques..." 
+                               onkeyup="searchSeriesGlobal()" 
+                               style="width: 100%; padding: 12px 15px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 1em;">
+                        <div id="search-results-container" style="margin-top: 15px;"></div>
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <button class="btn btn-success" onclick="openCreateModal()">
+                            ➕ Créer une bibliothèque
+                        </button>
+                    </div>
+
+                    <div id="libraries-container">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <p>Chargement des bibliothèques...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -106,5 +103,6 @@
     </div>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
     <script src="{{ url_for('static', filename='js/library.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

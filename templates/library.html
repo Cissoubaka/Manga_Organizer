@@ -4,25 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bibliothèque Manga</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-library-search.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-left">
-                    <h1 id="library-title">📚 Bibliothèque</h1>
-                    <p class="subtitle" id="library-path">Chargement...</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <a href="/" class="btn-back">← Retour aux bibliothèques</a>
-                    <a href="/nautiljon" class="btn" style="background: #667eea;">🌊 Nautiljon</a>
-                </div>
-            </div>
-        </header>
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+        </div>
 
-        <div class="content">
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1 id="library-title">📚 Bibliothèque</h1>
+                        <p class="subtitle" id="library-path">Chargement...</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
             <div class="controls">
                 <button class="btn" onclick="scanLibrary()">🔄 Scanner la bibliothèque</button>
                 <button class="btn" onclick="enrichAllSeries()" style="background: #10b981;">✨ Enrichir la bibliothèque</button>
@@ -64,6 +74,8 @@
                     <p>Chargement des données...</p>
                 </div>
             </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -87,5 +99,6 @@
    </script>
     <script src="{{ url_for('static', filename='js/nautiljon.js') }}"></script>
     <script src="{{ url_for('static', filename='js/library.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

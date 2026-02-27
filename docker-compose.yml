@@ -1,18 +1,26 @@
 services:
   manga-organizer:
-    build: .
+    image: cissoubaka/manga-organizer:latest
     container_name: manga-organizer
     ports:
       - "5000:5000"
     volumes:
-      # Montez le répertoire data pour la persistance
+      # Fichiers de l'application
+      - ./app.py:/app/app.py
+      - ./config.py:/app/config.py
+      - ./encryption.py:/app/encryption.py
+      - ./rename_handler.py:/app/rename_handler.py
+      - ./run.py:/app/run.py
+      - ./blueprints:/app/blueprints
+      - ./templates:/app/templates
+      - ./static:/app/static
+      # Persistance des données
       - ./data:/app/data
-      # Optionnel : montez le répertoire covers séparément pour faciliter les backups
       - ./data/covers:/app/data/covers
-      # montez le répertoire contenant les bibliothèques
+      # Bibliothèque
       - /path/to/library/:/library
     environment:
-      - FLASK_ENV=production
+      - FLASK_ENV=development
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
       # Configuration aMule - adresse IP de la machine aMule
       - AMULE_HOST=${AMULE_HOST:-host.docker.internal}

@@ -2,8 +2,8 @@
 FROM debian:trixie
 
 # Configurer les sources APT pour inclure contrib et non-free
-RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
-    echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+RUN echo "deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian-security trixie-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
     apt-get update -o Acquire::Retries=3 -o Acquire::http::timeout=60
 
 # Installer Python et les dépendances système (avec retries en cas d'erreur réseau)
@@ -31,6 +31,7 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 COPY app.py .
 COPY config.py .
 COPY encryption.py .
+COPY rename_handler.py .
 COPY run.py .
 COPY docker-entrypoint.sh .
 

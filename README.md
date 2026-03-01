@@ -209,6 +209,62 @@ AMULE_HOST=192.168.1.234
 ---
 
 
+### 📥 Import Automatique de Fichiers
+
+Configurez un import automatique pour que les fichiers soient importés dans vos bibliothèques selon une fréquence à choisir.
+
+#### Configuration de l'Import Automatique
+
+1. **Accédez à** → `Import` → Section "Configuration de l'Import Automatique" (en haut)
+
+2. **Paramètres disponibles** :
+   - **Activer l'import automatique** : Active/désactive le processus automatique
+   - **Autoriser auto-assignation** : Les fichiers seront automatiquement assignés à une série existante s'ils sont reconnaissables
+   - **Créer automatiquement les séries** : Crée une nouvelle série si elle n'existe pas
+   - **Chemin du répertoire d'import automatique** : Dossier où placer les fichiers à importer automatiquement
+   - **Fréquence d'import** : Tous les X minutes/heures/jours
+
+#### Logique d'Auto-Assignation
+
+Les fichiers sont auto-assignés si :
+- ✅ Le nom du fichier contient un titre de série reconnaissable
+- ✅ Le numéro de volume peut être extrait du nom du fichier
+- ✅ Une série existante correspond au titre extrait
+
+Exemple de noms de fichiers auto-assignables :
+```
+"Demon Slayer Vol 01.cbz"
+"Attack on Titan - Volume 15.zip"
+"Death Note 05.rar"
+"One Punch Man_12.epub"
+```
+
+#### Utilisation
+
+1. **Configurer** :
+   - Définir le chemin du dossier d'import automatique
+   - Choisir la fréquence (ex: toutes les heures)
+   - Activer l'auto-assignation si vous le souhaitez
+   - Cliquer sur "Enregistrer la configuration"
+
+2. **Tester** :
+   - Placer des fichiers dans le dossier d'import
+   - Cliquer sur "Tester l'import automatique" pour vérifier
+   - Les fichiers seront analysés et les auto-assignables seront identifiés
+
+3. **Autoriser l'auto-exécution** :
+   - Cocher "Activer l'import automatique"
+   - L'application scanning automiquement le dossier et importe les fichiers selon la fréquence définie
+
+#### Ce Qui Happen à l'Import
+
+- ✅ Fichiers importés → Déplacés vers le dossier de la série
+- 🔄 Fichiers remplacés → Ancien fichier archivé dans `_old_files/`
+- ⏭️ Doublons ignorés → Déplacés vers `_doublons/`
+- ❌ Fichiers non-assignables → Restent dans le dossier source
+
+---
+
 ### Technologies utilisées
 
 - **Back-end** : Flask 3.1.2

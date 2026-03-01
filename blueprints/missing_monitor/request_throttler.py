@@ -11,7 +11,7 @@ from functools import wraps
 class RequestThrottler:
     """Limite le nombre de requêtes vers les sources externes"""
     
-    def __init__(self, requests_per_minute: int = 30):
+    def __init__(self, requests_per_minute: int = 6):
         """
         Initialise le throttler
         

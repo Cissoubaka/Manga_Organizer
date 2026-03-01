@@ -13,7 +13,7 @@ import shutil
 
 def get_db_connection():
     """Retourne une connexion à la base de données"""
-    conn = sqlite3.connect(current_app.config['DATABASE'], timeout=30.0)
+    conn = sqlite3.connect(current_app.config['DATABASE'], timeout=120.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -640,6 +640,9 @@ def scan_import_directory():
 @library_bp.route('/api/import/execute', methods=['POST'])
 def execute_import():
     """Exécute l'import des fichiers vers leurs destinations"""
+    import uuid
+    from .import_history import log_import_operation, log_import_file, update_import_operation
+    
     data = request.json
     files_to_import = data.get('files', [])
     import_base_path = data.get('import_path', '')
@@ -648,6 +651,15 @@ def execute_import():
         return jsonify({'error': 'Aucun fichier à importer'}), 400
 
     try:
+        # Générer un ID d'opération unique
+        operation_id = str(uuid.uuid4())
+        
+        # Enregistrer le début de l'opération
+        log_import_operation(operation_id, 'manual_import', import_base_path, 'started')
+        
+        # Liste pour accumuler les logs à enregistrer ($pour éviter les problèmes de verrou SQLite)
+        logs_to_record = []
+        
         scanner = LibraryScanner()
         imported_count = 0
         replaced_count = 0
@@ -678,7 +690,7 @@ def execute_import():
                     continue
 
                 # Récupérer ou créer la série
-                conn = sqlite3.connect(current_app.config['DATABASE'], timeout=30)
+                conn = sqlite3.connect(current_app.config['DATABASE'], timeout=120.0, check_same_thread=False)
                 #conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
@@ -774,6 +786,18 @@ def execute_import():
                         shutil.move(source_path, target_path)
                         action_taken = 'replaced'
                         replaced_count += 1
+                        
+                        # Ajouter à la liste de logs
+                        logs_to_record.append({
+                            'operation_id': operation_id,
+                            'filename': file_data['filename'],
+                            'source_path': source_path,
+                            'destination_path': target_path,
+                            'series_title': series_title,
+                            'action': 'replaced',
+                            'status': 'success',
+                            'message': ''
+                        })
 
                     else:
                         # Le nouveau fichier est plus petit ou égal : ne pas importer
@@ -792,6 +816,19 @@ def execute_import():
                         shutil.move(source_path, doublon_path)
                         action_taken = 'skipped_duplicate'
                         skipped_count += 1
+                        
+                        # Ajouter à la liste de logs
+                        logs_to_record.append({
+                            'operation_id': operation_id,
+                            'filename': file_data['filename'],
+                            'source_path': source_path,
+                            'destination_path': doublon_path,
+                            'series_title': series_title,
+                            'action': 'skipped',
+                            'status': 'success',
+                            'message': ''
+                        })
+                        
                         conn.close()
                         continue
                 else:
@@ -808,6 +845,18 @@ def execute_import():
                     shutil.move(source_path, target_path)
                     action_taken = 'imported'
                     imported_count += 1
+                    
+                    # Ajouter à la liste de logs
+                    logs_to_record.append({
+                        'operation_id': operation_id,
+                        'filename': file_data['filename'],
+                        'source_path': source_path,
+                        'destination_path': target_path,
+                        'series_title': series_title,
+                        'action': 'imported',
+                        'status': 'success',
+                        'message': ''
+                    })
 
                 # Ajouter le volume à la base de données (sauf si skipped)
                 if action_taken != 'skipped_duplicate':
@@ -835,11 +884,41 @@ def execute_import():
                     'error': str(e)
                 })
                 print(f"Erreur import {file_data['filename']}: {e}")
+                
+                # Ajouter à la liste de logs
+                logs_to_record.append({
+                    'operation_id': operation_id,
+                    'filename': file_data['filename'],
+                    'source_path': file_data.get('filepath', ''),
+                    'destination_path': '',
+                    'series_title': '',
+                    'action': 'failed',
+                    'status': 'error',
+                    'message': str(e)
+                })
+                
                 import traceback
                 traceback.print_exc()
 
+        # Enregistrer tous les logs accumulés APRÈS la fin de la boucle d'import
+        # pour éviter les problèmes de verrou SQLite
+        for log_entry in logs_to_record:
+            try:
+                log_import_file(
+                    log_entry['operation_id'],
+                    log_entry['filename'],
+                    log_entry['source_path'],
+                    log_entry['destination_path'],
+                    log_entry['series_title'],
+                    log_entry['action'],
+                    log_entry['status'],
+                    log_entry.get('message', '')
+                )
+            except Exception as log_err:
+                print(f"Erreur lors de l'enregistrement du log: {log_err}")
+
         # Mettre à jour les statistiques des séries concernées
-        conn = sqlite3.connect(current_app.config['DATABASE'], timeout=30.0)
+        conn = sqlite3.connect(current_app.config['DATABASE'], timeout=120.0, check_same_thread=False)
         cursor = conn.cursor()
 
         # Récupérer toutes les séries uniques qui ont reçu des fichiers
@@ -860,6 +939,9 @@ def execute_import():
             cleaned_dirs = cleanup_empty_directories(import_base_path)
         else:
             cleaned_dirs = 0
+
+        # Mettre à jour l'opération avec le statut final
+        update_import_operation(operation_id, 'completed', imported_count, replaced_count, skipped_count, failed_count)
 
         return jsonify({
             'success': True,
@@ -1358,28 +1440,39 @@ def create_series_directory(library_id):
         # Vérifier si le répertoire existe déjà
         directory_exists = os.path.exists(series_path)
         
-        if series_exists_in_db or directory_exists:
+        # Si TOUT existe déjà, retourner sans rien faire
+        if series_exists_in_db and directory_exists:
             conn.close()
             return jsonify({
                 'success': True,
                 'path': series_path,
                 'message': 'La série existe déjà',
-                'series_exists_in_db': series_exists_in_db,
-                'directory_exists': directory_exists,
+                'series_exists_in_db': True,
+                'directory_exists': True,
                 'exists': True
             })
         
         try:
-            # Créer le répertoire
-            os.makedirs(series_path, exist_ok=True)
+            # Créer le répertoire s'il n'existe pas
+            if not directory_exists:
+                os.makedirs(series_path, exist_ok=True)
+            
+            # Ajouter la série à la base de données si elle n'existe pas
+            if not series_exists_in_db:
+                cursor.execute('''
+                    INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
+                    VALUES (?, ?, ?, 0, '[]', 0)
+                ''', (library_id, series_name, series_path))
+            
+            conn.commit()
             conn.close()
             
             return jsonify({
                 'success': True,
                 'path': series_path,
-                'message': f'Répertoire créé : {series_path}',
-                'series_exists_in_db': False,
-                'directory_exists': False,
+                'message': f'Répertoire créé et série ajoutée : {series_path}',
+                'series_exists_in_db': series_exists_in_db,
+                'directory_exists': directory_exists,
                 'exists': False
             })
         
@@ -1396,4 +1489,477 @@ def create_series_directory(library_id):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ========== FONCTIONS D'IMPORT AUTOMATIQUE ==========
+
+def load_library_import_config():
+    """Charge la configuration d'import automatique"""
+    config_file = current_app.config['LIBRARY_IMPORT_CONFIG_FILE']
+    
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            return json.load(f)
+    
+    return current_app.config['LIBRARY_IMPORT_CONFIG'].copy()
+
+
+def save_library_import_config(config):
+    """Sauvegarde la configuration d'import automatique"""
+    config_file = current_app.config['LIBRARY_IMPORT_CONFIG_FILE']
+    
+    try:
+        os.makedirs(os.path.dirname(config_file), exist_ok=True)
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=4)
+        return True
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde de la configuration d'import: {e}")
+        return False
+
+
+def can_auto_assign(parsed, config):
+    """Détermine si un fichier peut être auto-assigné
+    
+    Args:
+        parsed: Dictionnaire de données parsées du nom de fichier
+        config: Configuration d'import
+        
+    Returns:
+        True si le fichier peut être auto-assigné, False sinon
+    """
+    if not config.get('auto_assign_enabled', True):
+        return False
+    
+    # Vérifier que les informations minimales sont disponibles
+    # On doit avoir au moins le titre du manga et le numéro de volume
+    if not parsed.get('title') or parsed.get('volume') is None:
+        return False
+    
+    return True
+
+
+def find_auto_assign_destination(parsed, config):
+    """Trouve la destination automatique pour un fichier
+    
+    Args:
+        parsed: Dictionnaire de données parsées du nom de fichier
+        config: Configuration d'import
+        
+    Returns:
+        Dictionnaire avec destination ou None
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        title = parsed.get('title', '').strip()
+        
+        # Rechercher une série existante avec un titre similaire
+        # Faire une recherche case-insensitive et avec tolérance
+        cursor.execute('''
+            SELECT s.id, s.library_id, l.path, s.title
+            FROM series s
+            JOIN libraries l ON s.library_id = l.id
+            WHERE LOWER(s.title) = LOWER(?)
+            LIMIT 1
+        ''', (title,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            series_id, library_id, library_path, series_title = result
+            return {
+                'series_id': series_id,
+                'library_id': library_id,
+                'library_path': library_path,
+                'series_title': series_title,
+                'is_new_series': False
+            }
+        
+        # Pas de série existante encontrée, et création auto désactivée
+        return None
+        
+    except Exception as e:
+        print(f"Erreur lors de la recherche de destination: {e}")
+        return None
+
+
+def execute_auto_import(files_to_import, import_base_path):
+    """Exécute l'import automatique des fichiers
+    
+    Args:
+        files_to_import: Liste des fichiers à importer
+        import_base_path: Chemin de base du répertoire d'import
+        
+    Returns:
+        Tuple (success: bool, stats: dict) avec les statistiques d'import
+    """
+    try:
+        import uuid
+        from .import_history import log_import_operation, log_import_file, update_import_operation
+        
+        # Générer un ID d'opération unique
+        operation_id = str(uuid.uuid4())
+        
+        # Enregistrer le début de l'opération
+        log_import_operation(operation_id, 'auto_import', import_base_path, 'started')
+        
+        scanner = LibraryScanner()
+        imported_count = 0
+        replaced_count = 0
+        skipped_count = 0
+        failed_count = 0
+        
+        # Liste pour accumuler les logs à faire après fermeture de toutes les connexions
+        logs_to_record = []
+        
+        # Créer les répertoires spéciaux
+        if import_base_path:
+            old_files_dir = os.path.join(import_base_path, '_old_files')
+            doublons_dir = os.path.join(import_base_path, '_doublons')
+            os.makedirs(old_files_dir, exist_ok=True)
+            os.makedirs(doublons_dir, exist_ok=True)
+        
+        # Traiter chaque fichier
+        for file_data in files_to_import:
+            try:
+                source_path = file_data['filepath']
+                destination = file_data.get('destination')
+                source_size = file_data.get('file_size', 0)
+                
+                if not destination or not os.path.exists(source_path):
+                    failed_count += 1
+                    continue
+                
+                # Récupérer ou créer la série
+                conn = sqlite3.connect(current_app.config['DATABASE'], timeout=120.0, check_same_thread=False)
+                cursor = conn.cursor()
+                
+                if destination.get('is_new_series'):
+                    # Créer une nouvelle série
+                    series_title = destination['series_title']
+                    library_id = destination['library_id']
+                    library_path = destination['library_path']
+                    
+                    series_path = os.path.join(library_path, series_title)
+                    os.makedirs(series_path, exist_ok=True)
+                    
+                    cursor.execute('''
+                        INSERT INTO series (library_id, title, path, total_volumes, missing_volumes, has_parts)
+                        VALUES (?, ?, ?, 0, '[]', 0)
+                    ''', (library_id, series_title, series_path))
+                    
+                    series_id = cursor.lastrowid
+                    destination['series_id'] = series_id
+                    target_dir = series_path
+                    series_title_for_log = series_title
+                else:
+                    # Utiliser une série existante
+                    series_id = destination['series_id']
+                    library_path = destination['library_path']
+                    series_title = destination['series_title']
+                    series_title_for_log = series_title
+                    
+                    target_dir = os.path.join(library_path, series_title)
+                    os.makedirs(target_dir, exist_ok=True)
+                    
+                    cursor.execute('UPDATE series SET path = ? WHERE id = ?', (target_dir, series_id))
+                
+                # Construire le chemin de destination
+                target_path = os.path.join(target_dir, file_data['filename'])
+                
+                # Vérifier si un fichier existe déjà avec le même numéro de volume
+                volume_number = file_data['parsed'].get('volume')
+                existing_file_path = None
+                existing_file_size = 0
+                
+                if volume_number:
+                    cursor.execute('''
+                        SELECT filepath, file_size FROM volumes
+                        WHERE series_id = ? AND volume_number = ?
+                        ORDER BY id DESC LIMIT 1
+                    ''', (series_id, volume_number))
+                    
+                    existing_volume = cursor.fetchone()
+                    if existing_volume:
+                        existing_file_path = existing_volume[0]
+                        existing_file_size = existing_volume[1]
+                
+                action_taken = None
+                
+                # Si un fichier existe déjà pour ce volume
+                if existing_file_path and os.path.exists(existing_file_path):
+                    # Comparer les tailles
+                    if source_size > existing_file_size:
+                        # Remplacer
+                        old_filename = os.path.basename(existing_file_path)
+                        old_dest_path = os.path.join(old_files_dir, old_filename)
+                        
+                        if os.path.exists(old_dest_path):
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            base, ext = os.path.splitext(old_filename)
+                            old_dest_path = os.path.join(old_files_dir, f"{base}_{timestamp}{ext}")
+                        
+                        shutil.move(existing_file_path, old_dest_path)
+                        cursor.execute('DELETE FROM volumes WHERE filepath = ?', (existing_file_path,))
+                        shutil.move(source_path, target_path)
+                        action_taken = 'replaced'
+                        replaced_count += 1
+                        
+                        conn.commit()
+                        conn.close()
+                        
+                        # Ajouter à la liste de logs
+                        logs_to_record.append({
+                            'operation_id': operation_id,
+                            'filename': file_data['filename'],
+                            'source_path': source_path,
+                            'destination_path': target_path,
+                            'series_title': destination.get('series_title', ''),
+                            'action': 'replaced',
+                            'status': 'success',
+                            'message': ''
+                        })
+                        continue
+                    else:
+                        # Ignorer (fichier plus petit ou égal)
+                        doublon_path = os.path.join(doublons_dir, file_data['filename'])
+                        
+                        if os.path.exists(doublon_path):
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            base, ext = os.path.splitext(file_data['filename'])
+                            doublon_path = os.path.join(doublons_dir, f"{base}_{timestamp}{ext}")
+                        
+                        shutil.move(source_path, doublon_path)
+                        action_taken = 'skipped_duplicate'
+                        skipped_count += 1
+                        
+                        conn.commit()
+                        conn.close()
+                        
+                        # Ajouter à la liste de logs
+                        logs_to_record.append({
+                            'operation_id': operation_id,
+                            'filename': file_data['filename'],
+                            'source_path': source_path,
+                            'destination_path': doublon_path,
+                            'series_title': destination.get('series_title', ''),
+                            'action': 'skipped',
+                            'status': 'success',
+                            'message': ''
+                        })
+                        
+                        continue
+                else:
+                    # Import normal
+                    if os.path.exists(target_path):
+                        base, ext = os.path.splitext(file_data['filename'])
+                        counter = 1
+                        while os.path.exists(target_path):
+                            target_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
+                            counter += 1
+                    
+                    shutil.move(source_path, target_path)
+                    action_taken = 'imported'
+                    imported_count += 1
+                    
+                    # Ajouter le volume à la base de données
+                    parsed = file_data['parsed']
+                    page_count = scanner.get_page_count(target_path, parsed['format'])
+                    
+                    cursor.execute('''
+                        INSERT INTO volumes
+                        (series_id, part_number, part_name, volume_number, filename, filepath,
+                         author, year, resolution, file_size, page_count, format)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        series_id, parsed['part_number'], parsed['part_name'], parsed['volume'],
+                        os.path.basename(target_path), target_path, parsed['author'], parsed['year'],
+                        parsed['resolution'], source_size, page_count, parsed['format']
+                    ))
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    # Ajouter à la liste de logs
+                    logs_to_record.append({
+                        'operation_id': operation_id,
+                        'filename': file_data['filename'],
+                        'source_path': source_path,
+                        'destination_path': target_path,
+                        'series_title': destination.get('series_title', ''),
+                        'action': 'imported',
+                        'status': 'success',
+                        'message': ''
+                    })
+                
+            except Exception as e:
+                failed_count += 1
+                print(f"Erreur import {file_data['filename']}: {e}")
+                
+                # Ajouter à la liste de logs
+                logs_to_record.append({
+                    'operation_id': operation_id,
+                    'filename': file_data['filename'],
+                    'source_path': file_data.get('filepath', ''),
+                    'destination_path': '',
+                    'series_title': '',
+                    'action': 'failed',
+                    'status': 'error',
+                    'message': str(e)
+                })
+        
+        # Enregistrer tous les logs accumulés APRÈS la fin de la boucle d'import
+        # pour éviter les problèmes de verrou SQLite
+        for log_entry in logs_to_record:
+            try:
+                log_import_file(
+                    log_entry['operation_id'],
+                    log_entry['filename'],
+                    log_entry['source_path'],
+                    log_entry['destination_path'],
+                    log_entry['series_title'],
+                    log_entry['action'],
+                    log_entry['status'],
+                    log_entry.get('message', '')
+                )
+            except Exception as log_err:
+                print(f"Erreur lors de l'enregistrement du log: {log_err}")
+        
+        # Mettre à jour les statistiques des séries
+        conn = sqlite3.connect(current_app.config['DATABASE'], timeout=120.0, check_same_thread=False)
+        cursor = conn.cursor()
+        
+        series_ids = set()
+        for file_data in files_to_import:
+            dest = file_data.get('destination')
+            if dest and dest.get('series_id'):
+                series_ids.add(dest['series_id'])
+        
+        for series_id in series_ids:
+            scanner.update_series_stats(series_id, conn)
+        
+        conn.close()
+        
+        # Nettoyer les répertoires vides
+        if import_base_path:
+            cleanup_empty_directories(import_base_path)
+        
+        # Mettre à jour l'opération avec le statut final
+        update_import_operation(operation_id, 'completed', imported_count, replaced_count, skipped_count, failed_count)
+        
+        print(f"✓ Import automatique terminé: {imported_count} importés, {replaced_count} remplacés, {skipped_count} ignorés, {failed_count} erreurs")
+        return True, {
+            'operation_id': operation_id,
+            'imported_count': imported_count,
+            'replaced_count': replaced_count,
+            'skipped_count': skipped_count,
+            'failed_count': failed_count
+        }
+        
+    except Exception as e:
+        print(f"✗ Erreur lors de l'import automatique: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, {
+            'operation_id': None,
+            'imported_count': 0,
+            'replaced_count': 0,
+            'skipped_count': 0,
+            'failed_count': 0
+        }
+
+
+# ========== ROUTES API D'IMPORT AUTOMATIQUE ==========
+
+@library_bp.route('/api/import/config', methods=['GET', 'POST'])
+def import_config():
+    """Récupère ou met à jour la configuration d'import automatique"""
+    
+    if request.method == 'GET':
+        config = load_library_import_config()
+        return jsonify(config)
+    
+    else:  # POST
+        data = request.get_json()
+        config = load_library_import_config()
+        
+        # Mettre à jour les champs
+        if 'auto_import_enabled' in data:
+            config['auto_import_enabled'] = data['auto_import_enabled']
+        if 'import_path' in data:
+            config['import_path'] = data['import_path']
+        if 'auto_assign_enabled' in data:
+            config['auto_assign_enabled'] = data['auto_assign_enabled']
+        if 'auto_import_interval' in data:
+            config['auto_import_interval'] = data['auto_import_interval']
+        if 'auto_import_interval_unit' in data:
+            config['auto_import_interval_unit'] = data['auto_import_interval_unit']
+        
+        if save_library_import_config(config):
+            # Redémarrer le scheduler si nécessaire
+            if config.get('auto_import_enabled'):
+                from .scheduler import library_import_scheduler
+                interval = config.get('auto_import_interval', 60)
+                interval_unit = config.get('auto_import_interval_unit', 'minutes')
+                library_import_scheduler.add_job(interval, interval_unit)
+            else:
+                from .scheduler import library_import_scheduler
+                library_import_scheduler.remove_job()
+            
+            return jsonify({'success': True, 'config': config})
+        else:
+            return jsonify({'error': 'Erreur lors de la sauvegarde'}), 500
+
+# ========== ROUTES API D'HISTORIQUE D'IMPORT ==========
+
+@library_bp.route('/api/import/history', methods=['GET'])
+def import_history():
+    """Récupère l'historique des imports"""
+    try:
+        from .import_history import get_import_history
+        
+        limit = request.args.get('limit', 50, type=int)
+        history = get_import_history(limit)
+        
+        return jsonify({'success': True, 'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/import/history/<operation_id>', methods=['GET'])
+def import_operation_details(operation_id):
+    """Récupère les détails d'une opération d'import"""
+    try:
+        from .import_history import get_operation_details
+        
+        details = get_operation_details(operation_id)
+        
+        if not details:
+            return jsonify({'error': 'Opération non trouvée'}), 404
+        
+        return jsonify({'success': True, 'details': details})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@library_bp.route('/api/import/history/<operation_id>/undo', methods=['POST'])
+def undo_import_operation(operation_id):
+    """Annule une opération d'import"""
+    try:
+        from .import_history import undo_import_operation as do_undo
+        
+        success, message, errors = do_undo(operation_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': message, 'errors': errors})
+        else:
+            return jsonify({'error': message}), 400
+            
+    except Exception as e:
         return jsonify({'error': str(e)}), 500

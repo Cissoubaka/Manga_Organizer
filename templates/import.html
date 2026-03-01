@@ -32,6 +32,121 @@
 
             <div class="content-wrapper">
                 <div class="content">
+            
+            <!-- Configuration de l'import automatique -->
+            <div class="import-section" style="background: #f0f4ff; border-left: 4px solid #3b82f6; padding: 20px 20px; border-radius: 8px; margin-bottom: 30px;">
+                <h2 style="color: #3b82f6; margin-top: 0;">⚙️ Configuration de l'Import Automatique</h2>
+                
+                <div class="config-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Activation -->
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;
+                                      font-weight: 500; color: #1f2937;">
+                            <input type="checkbox" id="auto-import-enabled" style="width: 20px; height: 20px; cursor: pointer;">
+                            <span>Activer l'import automatique</span>
+                        </label>
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            Les fichiers auto-assignables seront importés automatiquement
+                        </small>
+                    </div>
+                    
+                    <!-- Intervention -->
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;
+                                      font-weight: 500; color: #1f2937;">
+                            <input type="checkbox" id="auto-assign-enabled" checked>
+                            <span>Autoriser auto-assignation</span>
+                        </label>
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            Les fichiers seront assignés automatiquement si possible
+                        </small>
+                    </div>
+                    
+                    <!-- Chemin d'import automatique -->
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="auto-import-path" style="font-weight: 500; color: #1f2937;">
+                            📁 Chemin du répertoire d'import automatique
+                        </label>
+                        <input type="text" id="auto-import-path" placeholder="/chemin/vers/dossier/auto-import"
+                               style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            Les fichiers de ce répertoire seront importés automatiquement
+                        </small>
+                    </div>
+                    
+                    <!-- Intervalle -->
+                    <div class="form-group">
+                        <label for="auto-import-interval" style="font-weight: 500; color: #1f2937;">
+                            ⏱️ Fréquence d'import
+                        </label>
+                        <div style="display: flex; gap: 10px; margin-top: 5px;">
+                            <input type="number" id="auto-import-interval" value="60" min="1" max="10080"
+                                   style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <select id="auto-import-interval-unit" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="minutes">Minutes</option>
+                                <option value="hours">Heures</option>
+                                <option value="days">Jours</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Boutons de configuration -->
+                <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; flex-wrap: wrap; align-items: center;">
+                    <button class="btn btn-success" onclick="saveAutoImportConfig()" style="background: #10b981;">
+                        💾 Enregistrer la configuration
+                    </button>
+                    <button class="btn" onclick="loadAutoImportConfig()" style="background: #6b7280;">
+                        🔄 Recharger
+                    </button>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button class="btn" id="test-auto-import-btn" onclick="testAutoImport()" style="background: #f59e0b;">
+                            ▶️ Executer l'import maintenant
+                        </button>
+                        <small style="color: #f59e0b; font-style: italic; white-space: nowrap;">
+                            Lance un vrai import avec auto-assignation
+                        </small>
+                    </div>
+                </div>
+                <div id="auto-import-status" style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none;"></div>
+            </div>
+
+            <!-- Historique des imports automatiques -->
+            <div class="import-section" style="background: #f3f4f6; border-left: 4px solid #8b5cf6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="color: #8b5cf6; margin: 0;">📋 Historique des Imports</h2>
+                    <button class="btn" onclick="loadImportHistory()" style="background: #8b5cf6; padding: 8px 15px; font-size: 14px;">
+                        🔄 Actualiser
+                    </button>
+                </div>
+                
+                <div id="history-container" style="display: none;">
+                    <div id="history-table-wrapper" style="overflow-x: auto;">
+                        <table id="history-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead>
+                                <tr style="background: #e9d5ff; border-bottom: 2px solid #8b5cf6;">
+                                    <th style="padding: 10px; text-align: left; font-weight: 600;">Date</th>
+                                    <th style="padding: 10px; text-align: left; font-weight: 600;">Status</th>
+                                    <th style="padding: 10px; text-align: center; font-weight: 600;">📥 Importés</th>
+                                    <th style="padding: 10px; text-align: center; font-weight: 600;">🔄 Remplacés</th>
+                                    <th style="padding: 10px; text-align: center; font-weight: 600;">⏭️ Ignorés</th>
+                                    <th style="padding: 10px; text-align: center; font-weight: 600;">❌ Erreurs</th>
+                                    <th style="padding: 10px; text-align: center; font-weight: 600;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="history-empty" style="padding: 20px; text-align: center; color: #666; display: none;">
+                        <p>Aucun import trouvé</p>
+                    </div>
+                </div>
+                
+                <div id="history-loading" style="text-align: center; padding: 20px; color: #666;">
+                    <p>Chargement de l'historique...</p>
+                </div>
+            </div>
+            
             <!-- Sélection du répertoire d'import -->
             <div class="import-section">
                 <h2>Répertoire d'import</h2>

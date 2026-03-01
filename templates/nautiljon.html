@@ -322,13 +322,6 @@
         const initialLibraryId = urlParams.get('libraryId');
         const initialSeriesId = urlParams.get('seriesId');
 
-        // Mettre à jour le bouton de retour en fonction de la source
-        const backButton = document.getElementById('back-button');
-        if (initialLibraryId) {
-            backButton.href = `/library/${initialLibraryId}`;
-            backButton.textContent = '← Retour à la bibliothèque';
-        }
-
         function switchTab(tabName) {
             // Cache tous les tabs
             document.querySelectorAll('.tab-content').forEach(el => {
@@ -354,9 +347,16 @@
         
         async function loadLibrariesForSingle() {
             try {
+                console.log('Loading libraries for single...');
                 const response = await fetch('/api/libraries');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const libraries = await response.json();
+                console.log('Libraries loaded:', libraries);
                 const select = document.getElementById('library-select-single');
+                if (!select) {
+                    console.error('Select element library-select-single not found');
+                    return;
+                }
                 select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
                 
                 // Si on vient d'une modal (libraryId dans les paramètres), pré-sélectionner
@@ -385,9 +385,16 @@
         
         async function loadLibrariesForBatch() {
             try {
+                console.log('Loading libraries for batch...');
                 const response = await fetch('/api/libraries');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const libraries = await response.json();
+                console.log('Libraries loaded:', libraries);
                 const select = document.getElementById('library-select-batch');
+                if (!select) {
+                    console.error('Select element library-select-batch not found');
+                    return;
+                }
                 select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
             } catch (error) {
                 console.error('Erreur chargement bibliothèques:', error);
@@ -396,9 +403,16 @@
         
         async function loadLibrariesForLibrary() {
             try {
+                console.log('Loading libraries for library...');
                 const response = await fetch('/api/libraries');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const libraries = await response.json();
+                console.log('Libraries loaded:', libraries);
                 const select = document.getElementById('library-select');
+                if (!select) {
+                    console.error('Select element library-select not found');
+                    return;
+                }
                 select.innerHTML = libraries.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
             } catch (error) {
                 console.error('Erreur chargement bibliothèques:', error);
@@ -787,11 +801,11 @@
             
             loadLibrariesForSingle();
         });
+    </script>
                 </div>
             </div>
         </div>
     </div>
-    </script>
     <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
 </body>
 </html>

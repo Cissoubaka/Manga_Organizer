@@ -25,6 +25,7 @@ class Config:
     EBDZ_CONFIG_FILE = os.path.join(DATA_DIR, 'ebdz_config.json')
     PROWLARR_CONFIG_FILE = os.path.join(DATA_DIR, 'prowlarr_config.json')
     MISSING_MONITOR_CONFIG_FILE = os.path.join(DATA_DIR, 'missing_monitor_config.json')
+    LIBRARY_IMPORT_CONFIG_FILE = os.path.join(DATA_DIR, 'library_import_config.json')
     
     # eMule/aMule par défaut
     # Pour Docker: utiliser AMULE_HOST pour configurer l'adresse
@@ -65,6 +66,16 @@ class Config:
         'port': 8080,
         'username': '',
         'password': ''
+    }
+    
+    # Configuration d'import automatique
+    LIBRARY_IMPORT_CONFIG = {
+        'auto_import_enabled': False,
+        'import_path': '',
+        'auto_assign_enabled': True,
+        'auto_assign_rules': [],  # Liste des règles d'auto-assignation
+        'auto_import_interval': 60,  # en minutes
+        'auto_import_interval_unit': 'minutes'  # 'minutes', 'hours', 'days'
     }
     
     @staticmethod

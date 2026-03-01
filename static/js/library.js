@@ -1,4 +1,11 @@
-//const libraryId = {{ library_id }};
+// Le libraryId est défini par le template HTML
+// Si ce n'est pas défini (par exemple depuis index.html), on le récupère depuis l'URL
+if (typeof window.libraryId === 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const urlLibraryId = params.get('libraryId');
+    window.libraryId = urlLibraryId ? parseInt(urlLibraryId) : null;
+}
+
 let seriesData = [];
 let showOnlyMissing = false;
 let showOnlyUnenriched = false;
@@ -7,42 +14,72 @@ let currentSeriesTitle = '';
 
 async function loadLibraryInfo() {
     try {
+        const titleEl = document.getElementById('library-title');
+        const pathEl = document.getElementById('library-path');
+        
+        // Ne charger que si on est sur la page library.html
+        if (!titleEl || !pathEl) {
+            return;
+        }
+        
         const response = await fetch(`/api/libraries/${libraryId}`);
         const library = await response.json();
         
-        document.getElementById('library-title').textContent = `📚 ${library.name}`;
-        document.getElementById('library-path').textContent = library.path;
+        titleEl.textContent = `📚 ${library.name}`;
+        pathEl.textContent = library.path;
     } catch (error) {
         console.error('Erreur chargement bibliothèque:', error);
     }
 }
 
+
 async function loadLibraryData() {
+    console.log('loadLibraryData appelée, libraryId:', libraryId);
     const grid = document.getElementById('series-grid');
+    
+    // Ne charger les données que si on est sur la page library.html
+    if (!grid) {
+        console.warn('series-grid non trouvé, pas sur library.html');
+        return;
+    }
+    
+    console.log('Affichage du loading...');
     grid.innerHTML = '<div class="loading"><div class="spinner"></div><p>Chargement des données...</p></div>';
 
     try {
+        console.log('Appel API pour libraryId:', libraryId);
         const [seriesResponse, statsResponse] = await Promise.all([
             fetch(`/api/library/${libraryId}/series`),
             fetch(`/api/library/${libraryId}/stats`)
         ]);
 
+        console.log('Réponses reçues:', seriesResponse.ok, statsResponse.ok);
+        
         const series = await seriesResponse.json();
         const stats = await statsResponse.json();
 
+        console.log('Données chargées:', series.length, 'séries');
+        
         seriesData = series;
         updateStats(stats);
         displaySeries(series);
     } catch (error) {
+        console.error('Erreur dans loadLibraryData:', error);
         grid.innerHTML = `<div class="no-data"><h3>Erreur de chargement</h3><p>${error.message}</p></div>`;
     }
 }
 
 function updateStats(stats) {
-    document.getElementById('series-count').textContent = stats.total_series;
-    document.getElementById('volumes-count').textContent = stats.total_volumes;
-    document.getElementById('total-size').textContent = formatBytes(stats.total_size);
-    document.getElementById('avg-pages').textContent = stats.avg_pages;
+    // Vérifier que les éléments de stats existent (ils n'existent que sur library.html)
+    const seriesCountEl = document.getElementById('series-count');
+    const volumesCountEl = document.getElementById('volumes-count');
+    const totalSizeEl = document.getElementById('total-size');
+    const avgPagesEl = document.getElementById('avg-pages');
+    
+    if (seriesCountEl) seriesCountEl.textContent = stats.total_series;
+    if (volumesCountEl) volumesCountEl.textContent = stats.total_volumes;
+    if (totalSizeEl) totalSizeEl.textContent = formatBytes(stats.total_size);
+    if (avgPagesEl) avgPagesEl.textContent = stats.avg_pages;
 }
 
 function displaySeries(series) {
@@ -232,32 +269,68 @@ function toggleUnenrichedFilter() {
     filterSeries();
 }
 
-async function scanLibrary() {
-    const button = event.target;
-    button.disabled = true;
-    button.textContent = '⏳ Scan en cours...';
-
-    try {
-        const response = await fetch(`/api/scan/${libraryId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
+async function scanLibrary(passedLibraryId) {
+    // Support deux modes d'appel:
+    // 1. Depuis library.html: sans paramètre, utilise libraryId global et event.target pour le bouton
+    // 2. Depuis index.html: avec libraryId en paramètre
+    
+    let libId = passedLibraryId || libraryId;
+    
+    if (!libId) {
+        alert('❌ Erreur: Aucune bibliothèque sélectionnée');
+        return;
+    }
+    
+    // Vérifier si on est sur library.html en regardant si l'élément series-grid existe
+    const isLibraryPage = document.getElementById('series-grid') !== null;
+    
+    if (isLibraryPage && event?.target) {
+        // Mode library.html: le bouton "Scanner" sur la page de détail
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = '⏳ Scan en cours...';
         
-        const data = await response.json();
-        
-        if (data.success) {
-            alert(`✅ Scan terminé !\n${data.series_count} séries trouvées.\n\n💡 Utilisez le bouton "Enrichir la bibliothèque" pour récupérer les infos Nautiljon`);
-            await loadLibraryData();
-            await loadLibraryData();
-        } else {
-            alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+        try {
+            const response = await fetch(`/api/scan/${libId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ Scan terminé !\n${data.series_count} séries trouvées.\n\n💡 Utilisez le bouton "Enrichir la bibliothèque" pour récupérer les infos Nautiljon`);
+                await loadLibraryData();
+                await loadLibraryData();
+            } else {
+                alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        } catch (error) {
+            alert('❌ Erreur de connexion: ' + error.message);
+        } finally {
+            button.disabled = false;
+            button.textContent = '🔄 Scanner';
         }
-    } catch (error) {
-        alert('❌ Erreur de connexion: ' + error.message);
-    } finally {
-        button.disabled = false;
-        button.textContent = '🔄 Scanner la bibliothèque';
+    } else {
+        // Mode index.html: le bouton "Scanner" sur la liste des bibliothèques
+        if (!confirm('Voulez-vous scanner cette bibliothèque ? Cela peut prendre du temps.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/scan/${libId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                alert(`✅ Scan terminé ! ${data.series_count} séries trouvées.`);
+                location.reload();
+            } else {
+                alert('❌ Erreur: ' + (data.error || 'Erreur inconnue'));
+            }
+        } catch (error) {
+            alert('❌ Erreur: ' + error.message);
+        }
     }
 }
 
@@ -607,6 +680,10 @@ async function enrichSeriesFromModal(seriesId, seriesTitle, evt) {
                 btn.textContent = '❌ Erreur';
                 btn.disabled = false;
             }
+        } else {
+            btn.textContent = '❌ API non disponible';
+            btn.disabled = false;
+            console.error('NautiljonAPI n\'est pas défini');
         }
     } catch (error) {
         btn.textContent = '❌ Erreur';
@@ -1414,7 +1491,12 @@ document.addEventListener('click', function(event) {
     }
 });
 
-window.addEventListener('load', function() {
-    loadLibraryInfo();
-    loadLibraryData();
-});
+// Ne charger les données que si on est sur la page de détails d'une bibliothèque
+console.log('Library ID:', libraryId);
+if (libraryId) {
+    window.addEventListener('load', function() {
+        console.log('Chargement des données de la bibliothèque:', libraryId);
+        loadLibraryInfo();
+        loadLibraryData();
+    });
+}

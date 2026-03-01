@@ -38,3 +38,4 @@ data/prowlarr_config.json
 Dockerfile
 docker-compose.yml
 *.md
+*.log

@@ -53,8 +53,16 @@ def create_app(config_name='default'):
     missing_volume_scheduler = MissingVolumeScheduler()
     missing_volume_scheduler.init_app(app)
     
+    # Initialiser le scheduler d'import automatique
+    from blueprints.library.scheduler import library_import_scheduler
+    library_import_scheduler.init_app(app)
+    
     # Démarrer les schedulers et charger les configurations automatiques
     with app.app_context():
+        # Initialiser la table d'historique des imports
+        from blueprints.library.import_history import init_import_history_table
+        init_import_history_table()
+        
         from blueprints.ebdz.routes import load_ebdz_config
         ebdz_config = load_ebdz_config()
         
@@ -63,6 +71,16 @@ def create_app(config_name='default'):
             interval_unit = ebdz_config.get('auto_scrape_interval_unit', 'minutes')
             ebdz_scheduler.add_job(interval, interval_unit)
             print(f"✓ Scraping automatique EBDZ activé: tous les {interval} {interval_unit}")
+        
+        # Charger la configuration d'import automatique
+        from blueprints.library.routes import load_library_import_config
+        import_config = load_library_import_config()
+        
+        if import_config.get('auto_import_enabled', False):
+            interval = import_config.get('auto_import_interval', 60)
+            interval_unit = import_config.get('auto_import_interval_unit', 'minutes')
+            library_import_scheduler.add_job(interval, interval_unit)
+            print(f"✓ Import automatique activé: tous les {interval} {interval_unit}")
         
         # Charger la configuration de surveillance des volumes manquants
         from blueprints.missing_monitor.routes import load_monitor_config

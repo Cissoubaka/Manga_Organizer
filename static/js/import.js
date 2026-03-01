@@ -855,6 +855,171 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+// ===== FONCTIONS D'IMPORT AUTOMATIQUE =====
+
+async function loadAutoImportConfig() {
+    try {
+        const response = await fetch('/api/import/config');
+        const config = await response.json();
+        
+        document.getElementById('auto-import-enabled').checked = config.auto_import_enabled;
+        document.getElementById('auto-assign-enabled').checked = config.auto_assign_enabled;
+        document.getElementById('auto-import-path').value = config.import_path || '';
+        document.getElementById('auto-import-interval').value = config.auto_import_interval || 60;
+        document.getElementById('auto-import-interval-unit').value = config.auto_import_interval_unit || 'minutes';
+        
+        showAutoImportStatus('Configuration chargée', 'success');
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration:', error);
+        showAutoImportStatus('Erreur lors du chargement', 'error');
+    }
+}
+
+async function saveAutoImportConfig() {
+    try {
+        const config = {
+            auto_import_enabled: document.getElementById('auto-import-enabled').checked,
+            auto_assign_enabled: document.getElementById('auto-assign-enabled').checked,
+            import_path: document.getElementById('auto-import-path').value,
+            auto_import_interval: parseInt(document.getElementById('auto-import-interval').value),
+            auto_import_interval_unit: document.getElementById('auto-import-interval-unit').value
+        };
+        
+        const response = await fetch('/api/import/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erreur lors de la sauvegarde');
+        }
+        
+        const result = await response.json();
+        if (result.success) {
+            showAutoImportStatus(
+                'Configuration sauvegardée avec succès' + 
+                (config.auto_import_enabled ? '. Import automatique activé ✓' : ''),
+                'success'
+            );
+        } else {
+            showAutoImportStatus('Erreur: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        showAutoImportStatus('Erreur lors de la sauvegarde', 'error');
+    }
+}
+
+async function testAutoImport() {
+    try {
+        const btn = document.getElementById('test-auto-import-btn');
+        btn.disabled = true;
+        btn.textContent = '🔄 Import en cours...';
+        
+        const config = {
+            auto_import_enabled: document.getElementById('auto-import-enabled').checked,
+            auto_assign_enabled: document.getElementById('auto-assign-enabled').checked,
+            import_path: document.getElementById('auto-import-path').value,
+            auto_import_interval: parseInt(document.getElementById('auto-import-interval').value),
+            auto_import_interval_unit: document.getElementById('auto-import-interval-unit').value
+        };
+        
+        if (!config.import_path) {
+            throw new Error('Veuillez spécifier un chemin d\'import');
+        }
+        
+        // Sauvegarder la config
+        let response = await fetch('/api/import/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erreur lors de la sauvegarde de la configuration');
+        }
+        
+        // Utiliser le chemin du config pour scanner au lieu du chemin manuel
+        document.getElementById('import-path').value = config.import_path;
+        
+        // Scanner le répertoire (utilise la fonction existante)
+        showAutoImportStatus('Scan en cours...', 'info');
+        await scanImportDirectory();
+        
+        // Vérifier si des fichiers ont été trouvés
+        if (importFiles.length === 0) {
+            showAutoImportStatus('✓ Aucun fichier trouvé à importer', 'success');
+            return;
+        }
+        
+        // Auto-assigner les fichiers (utilise la fonction existante)
+        if (config.auto_assign_enabled) {
+            showAutoImportStatus('Auto-assignation en cours...', 'info');
+            await autoMatchAll();
+        }
+        
+        // Vérifier s'il y a des fichiers assignés
+        const assignedFiles = importFiles.filter(f => f.destination);
+        if (assignedFiles.length === 0) {
+            showAutoImportStatus(
+                `⚠️ Aucun fichier auto-assignable (${importFiles.length} détecté(s), 0 assigné(s))`,
+                'error'
+            );
+            return;
+        }
+        
+        // Exécuter l'import (utilise la fonction existante)
+        showAutoImportStatus('Import en cours...', 'info');
+        await executeImport();
+        
+        showAutoImportStatus(
+            `✅ Import automatique terminé!`,
+            'success'
+        );
+        
+    } catch (error) {
+        console.error('Erreur lors du test:', error);
+        showAutoImportStatus('Erreur: ' + error.message, 'error');
+    } finally {
+        const btn = document.getElementById('test-auto-import-btn');
+        btn.disabled = false;
+        btn.textContent = '▶️ Testez l\'import maintenant';
+    }
+}
+
+function showAutoImportStatus(message, type) {
+    const statusDiv = document.getElementById('auto-import-status');
+    statusDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    if (type === 'success') {
+        statusDiv.style.background = '#d1fae5';
+        statusDiv.style.color = '#065f46';
+        statusDiv.style.borderLeft = '4px solid #10b981';
+    } else if (type === 'info') {
+        statusDiv.style.background = '#dbeafe';
+        statusDiv.style.color = '#0c4a6e';
+        statusDiv.style.borderLeft = '4px solid #3b82f6';
+    } else {
+        statusDiv.style.background = '#fee2e2';
+        statusDiv.style.color = '#7f1d1d';
+        statusDiv.style.borderLeft = '4px solid #ef4444';
+    }
+    
+    // Masquer après 10 secondes (plus de temps pour lire les résultats d'import)
+    // Mais pas pour 'info' car c'est temporaire
+    if (type !== 'info') {
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 10000);
+    }
+}
+
 window.onclick = function(event) {
     const modal = document.getElementById('select-destination-modal');
     if (event.target == modal) {
@@ -862,7 +1027,223 @@ window.onclick = function(event) {
     }
 }
 
+// ===== HISTORIQUE DES IMPORTS =====
+async function loadImportHistory() {
+    try {
+        const container = document.getElementById('history-container');
+        const loading = document.getElementById('history-loading');
+        
+        loading.style.display = 'block';
+        container.style.display = 'none';
+        
+        const response = await fetch('/api/import/history?limit=50');
+        const data = await response.json();
+        
+        if (data.success && data.history && data.history.length > 0) {
+            displayImportHistory(data.history);
+            container.style.display = 'block';
+            loading.style.display = 'none';
+        } else {
+            document.getElementById('history-empty').style.display = 'block';
+            document.getElementById('history-table-wrapper').style.display = 'none';
+            container.style.display = 'block';
+            loading.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Erreur chargement historique:', error);
+        document.getElementById('history-loading').innerHTML = `<p style="color: red;">Erreur: ${error.message}</p>`;
+    }
+}
+
+function displayImportHistory(history) {
+    const tbody = document.getElementById('history-body');
+    tbody.innerHTML = '';
+    
+    const tableWrapper = document.getElementById('history-table-wrapper');
+    tableWrapper.style.display = 'table';
+    document.getElementById('history-empty').style.display = 'none';
+    
+    history.forEach(operation => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #e5e7eb';
+        row.style.cursor = 'pointer';
+        row.style.transition = 'background-color 0.2s';
+        
+        // Au survol, changer la couleur de fond
+        row.onmouseover = () => row.style.background = '#fafafa';
+        row.onmouseout = () => row.style.background = '';
+        
+        // Cliquer sur la ligne pour voir les détails
+        row.onclick = () => showHistoryDetails(operation.operation_id);
+        
+        // Formater la date
+        const date = new Date(operation.created_at);
+        const dateStr = date.toLocaleString('fr-FR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Déterminer la couleur du badge de statut
+        let statusColor = '#8b5cf6';
+        let statusText = operation.status;
+        
+        if (operation.status === 'completed') {
+            statusColor = '#10b981';
+            statusText = '✅ Complété';
+        } else if (operation.status === 'started') {
+            statusColor = '#f59e0b';
+            statusText = '⏳ En cours';
+        } else if (operation.status === 'undone') {
+            statusColor = '#6b7280';
+            statusText = '↩️ Annulé';
+        } else if (operation.status === 'failed') {
+            statusColor = '#ef4444';
+            statusText = '❌ Échoué';
+        }
+        
+        const statusBadge = `<span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">${statusText}</span>`;
+        
+        row.innerHTML = `
+            <td style="padding: 10px;">${dateStr}</td>
+            <td style="padding: 10px;">${statusBadge}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 500;">${operation.files_imported || 0}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 500;">${operation.files_replaced || 0}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 500;">${operation.files_skipped || 0}</td>
+            <td style="padding: 10px; text-align: center; font-weight: 500;" style="color: ${operation.files_failed > 0 ? '#ef4444' : '#666'};">${operation.files_failed || 0}</td>
+            <td style="padding: 10px; text-align: center;">
+                <button class="btn" style="padding: 4px 8px; font-size: 12px; background: #8b5cf6; margin-right: 5px;" onclick="event.stopPropagation(); showHistoryDetails('${operation.operation_id}');">
+                    📋 Détails
+                </button>
+                ${operation.status === 'completed' ? `
+                    <button class="btn" style="padding: 4px 8px; font-size: 12px; background: #ef4444;" onclick="event.stopPropagation(); undoImportOperation('${operation.operation_id}');">
+                        ↩️ Annuler
+                    </button>
+                ` : ''}
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+async function showHistoryDetails(operationId) {
+    try {
+        const response = await fetch(`/api/import/history/${operationId}`);
+        const data = await response.json();
+        
+        if (data.success && data.details) {
+            const { operation, files } = data.details;
+            
+            let detailsHtml = `
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-top: 15px; border: 2px solid #8b5cf6;">
+                    <button style="float: right; background: none; border: none; font-size: 20px; cursor: pointer;" onclick="this.parentElement.style.display='none';">×</button>
+                    <h3 style="color: #8b5cf6; margin-top: 0;">Détails de l'opération</h3>
+                    <p><strong>ID:</strong> ${operation.operation_id}</p>
+                    <p><strong>Date:</strong> ${new Date(operation.created_at).toLocaleString('fr-FR')}</p>
+                    <p><strong>Status:</strong> ${operation.status}</p>
+                    <p><strong>Chemin:</strong> ${operation.import_path}</p>
+                    
+                    <div style="margin-top: 15px; padding: 15px; background: #f0f4ff; border-radius: 4px;">
+                        <h4 style="margin-top: 0;">Résumé</h4>
+                        <p>📥 Importés: <strong>${operation.files_imported}</strong></p>
+                        <p>🔄 Remplacés: <strong>${operation.files_replaced}</strong></p>
+                        <p>⏭️ Ignorés: <strong>${operation.files_skipped}</strong></p>
+                        <p>❌ Erreurs: <strong>${operation.files_failed}</strong></p>
+                    </div>
+                    
+                    ${files && files.length > 0 ? `
+                        <h4 style="margin-top: 20px;">Fichiers (${files.length})</h4>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #e9d5ff; border-bottom: 1px solid #8b5cf6;">
+                                    <th style="padding: 8px; text-align: left;">Fichier</th>
+                                    <th style="padding: 8px; text-align: left;">Série</th>
+                                    <th style="padding: 8px; text-align: left;">Action</th>
+                                    <th style="padding: 8px; text-align: left;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${files.map(f => `
+                                    <tr style="border-bottom: 2px solid #e5e7eb;">
+                                        <td style="padding: 8px; font-weight: 500;">${f.filename}</td>
+                                        <td style="padding: 8px;">${f.series_title || '-'}</td>
+                                        <td style="padding: 8px;">
+                                            <span style="background: #dbeafe; color: #0c4a6e; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">${f.action || '-'}</span>
+                                        </td>
+                                        <td style="padding: 8px;">
+                                            <span style="background: ${f.status === 'success' ? '#d1fae5' : '#fee2e2'}; color: ${f.status === 'success' ? '#065f46' : '#7f1d1d'}; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">${f.status || '-'}</span>
+                                        </td>
+                                    </tr>
+                                    <tr style="background: #fafafa; border-bottom: 1px solid #e5e7eb;">
+                                        <td colspan="4" style="padding: 10px;">
+                                            <div style="font-size: 12px; color: #666;">
+                                                <div><strong>Source:</strong> ${f.source_path || '-'}</div>
+                                                <div><strong>Destination:</strong> ${f.destination_path || '-'}</div>
+                                                ${f.message ? `<div style="color: #ef4444; margin-top: 5px;"><strong>Message:</strong> ${f.message}</div>` : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p style="color: #999;">Aucun fichier enregistré</p>'}
+                </div>
+            `;
+            
+            // Insérer après la table d'historique ou au début du container
+            let detailsDiv = document.getElementById('history-details');
+            if (!detailsDiv) {
+                detailsDiv = document.createElement('div');
+                detailsDiv.id = 'history-details';
+                document.getElementById('history-container').appendChild(detailsDiv);
+            }
+            
+            detailsDiv.innerHTML = detailsHtml;
+            
+            // Scroll vers les détails
+            detailsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alert('Erreur: Impossible de charger les détails');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur: ' + error.message);
+    }
+}
+
+async function undoImportOperation(operationId) {
+    if (!confirm('Êtes-vous sûr de vouloir annuler cette opération d\'import ?\n\nLes fichiers importés seront déplacés vers un dossier _undo.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/import/history/${operationId}/undo`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Annulation réussie!\n\n${data.message}`);
+            loadImportHistory(); // Recharger l'historique
+        } else {
+            alert(`❌ Erreur: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur: ' + error.message);
+    }
+}
+
 window.addEventListener('load', function() {
     loadAllLibraries();
     loadImportPath();
+    loadAutoImportConfig();
+    loadImportHistory();
 });

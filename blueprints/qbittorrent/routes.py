@@ -356,13 +356,14 @@ def create_qbittorrent_session(config, for_test=False):
 def add_torrent():
     """Ajoute un torrent à qBittorrent
     
-    Supporte:
-    - Les magnet links (passés en tant qu'URL directement)
-    - Les URLs de fichiers torrent (téléchargées localement avant envoi)
+    Procédure:
+    - Les magnet links sont envoyés directement
+    - Les URLs de fichiers torrent sont téléchargées puis envoyées comme fichier
     """
     try:
         import sys
         import tempfile
+        import shutil
         
         config = load_qbittorrent_config()
         
@@ -387,24 +388,10 @@ def add_torrent():
         
         print(f"[qBittorrent Add] URL API: {api_url}", file=sys.stderr)
         
-        # Préparer le payload et les fichiers
+        # Préparer le payload
         payload = {'paused': 'false'}  # String 'false' pour qBittorrent API
         files_to_send = None
-        
-        # Vérifier si c'est un magnet link
-        if torrent_url.startswith('magnet:'):
-            # Magnet link - envoyer directement comme URL
-            payload['urls'] = torrent_url
-            print(f"[qBittorrent Add] Magnet link détecté", file=sys.stderr)
-        else:
-            # C'est une URL de fichier torrent
-            # Essayer d'abord de l'envoyer directement à qBittorrent
-            # Si ça échoue, télécharger le fichier
-            
-            # Essai 1: Envoyer directement comme URL (qBittorrent va le télécharger)
-            payload['urls'] = torrent_url
-            print(f"[qBittorrent Add] URL de fichier torrent détectée", file=sys.stderr)
-            print(f"[qBittorrent Add] Envoi direct à qBittorrent (sans pré-téléchargement)", file=sys.stderr)
+        torrent_file_path = None
         
         # Ajouter la catégorie si fournie
         category = data.get('category', '').strip()
@@ -421,23 +408,80 @@ def add_torrent():
                 payload['tags'] = ','.join(tags)
                 print(f"[qBittorrent Add] Tags: {payload['tags']}", file=sys.stderr)
         
+        # Vérifier si c'est un magnet link
+        if torrent_url.startswith('magnet:'):
+            # Magnet link - envoyer directement comme URL
+            payload['urls'] = torrent_url
+            print(f"[qBittorrent Add] Magnet link détecté", file=sys.stderr)
+        else:
+            # C'est une URL de fichier torrent - télécharger le fichier
+            print(f"[qBittorrent Add] URL de fichier torrent détectée - téléchargement en cours...", file=sys.stderr)
+            
+            try:
+                # Télécharger le fichier torrent
+                torrent_response = requests.get(torrent_url, timeout=30, verify=False)
+                torrent_response.raise_for_status()
+                
+                # Créer un fichier temporaire
+                temp_dir = tempfile.gettempdir()
+                torrent_file_path = os.path.join(temp_dir, 'manga_organizer_torrent.torrent')
+                
+                # Écrire le fichier
+                with open(torrent_file_path, 'wb') as f:
+                    f.write(torrent_response.content)
+                
+                print(f"[qBittorrent Add] Torrent téléchargé: {torrent_file_path} ({len(torrent_response.content)} bytes)", file=sys.stderr)
+                
+                # Préparer le fichier à envoyer en multipart
+                files_to_send = {
+                    'torrents': ('torrent.torrent', open(torrent_file_path, 'rb'), 'application/x-bittorrent')
+                }
+                
+            except requests.exceptions.Timeout:
+                return jsonify({
+                    'success': False,
+                    'error': 'Timeout lors du téléchargement du torrent'
+                }), 500
+            except requests.exceptions.ConnectionError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Impossible de télécharger le torrent depuis Prowlarr/ED2K'
+                }), 500
+            except Exception as e:
+                print(f"[qBittorrent Add] Erreur téléchargement torrent: {str(e)}", file=sys.stderr)
+                return jsonify({
+                    'success': False,
+                    'error': f"Erreur lors du téléchargement du torrent: {str(e)}"
+                }), 500
+        
         # Convertir tous les paramètres en strings pour le form-data
         data_payload = {k: str(v) if not isinstance(v, str) else v for k, v in payload.items()}
         
         print(f"[qBittorrent Add] Payload avant envoi: {data_payload}", file=sys.stderr)
-        print(f"[qBittorrent Add] Files à envoyer: {files_to_send is not None}", file=sys.stderr)
+        print(f"[qBittorrent Add] Fichier à envoyer: {files_to_send is not None}", file=sys.stderr)
         
         # Envoyer à qBittorrent
-        if files_to_send:
-            # Envoyer le fichier binaire avec les paramètres en data
-            print(f"[qBittorrent Add] Envoi du fichier torrent (multipart)", file=sys.stderr)
-            response = session.post(api_url, data=data_payload, files=files_to_send, timeout=10, verify=False)
-            print(f"[qBittorrent Add] Réponse après file upload: status={response.status_code}, body={response.text[:200] if response.text else 'vide'}", file=sys.stderr)
-        else:
-            # Envoyer comme URL (magnet)
-            print(f"[qBittorrent Add] Envoi du magnet link ou URL", file=sys.stderr)
-            response = session.post(api_url, data=data_payload, timeout=10, verify=False)
-            print(f"[qBittorrent Add] Réponse après URL: status={response.status_code}, body={response.text[:200] if response.text else 'vide'}", file=sys.stderr)
+        try:
+            if files_to_send:
+                # Envoyer le fichier binaire avec les paramètres en data
+                print(f"[qBittorrent Add] Envoi du fichier torrent (multipart)", file=sys.stderr)
+                response = session.post(api_url, data=data_payload, files=files_to_send, timeout=10, verify=False)
+                print(f"[qBittorrent Add] Réponse après file upload: status={response.status_code}, body={response.text[:200] if response.text else 'vide'}", file=sys.stderr)
+            else:
+                # Envoyer comme URL (magnet)
+                print(f"[qBittorrent Add] Envoi du magnet link", file=sys.stderr)
+                response = session.post(api_url, data=data_payload, timeout=10, verify=False)
+                print(f"[qBittorrent Add] Réponse après URL: status={response.status_code}, body={response.text[:200] if response.text else 'vide'}", file=sys.stderr)
+        finally:
+            # Fermer et supprimer le fichier temporaire
+            if files_to_send and torrent_file_path:
+                try:
+                    files_to_send['torrents'][1].close()
+                    if os.path.exists(torrent_file_path):
+                        os.remove(torrent_file_path)
+                    print(f"[qBittorrent Add] Fichier temporaire supprimé", file=sys.stderr)
+                except Exception as e:
+                    print(f"[qBittorrent Add] Erreur suppression fichier temp: {str(e)}", file=sys.stderr)
         
         print(f"[qBittorrent Add] Réponse status final: {response.status_code}", file=sys.stderr)
         

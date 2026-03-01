@@ -5,15 +5,6 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      # Fichiers de l'application
-      - ./app.py:/app/app.py
-      - ./config.py:/app/config.py
-      - ./encryption.py:/app/encryption.py
-      - ./rename_handler.py:/app/rename_handler.py
-      - ./run.py:/app/run.py
-      - ./blueprints:/app/blueprints
-      - ./templates:/app/templates
-      - ./static:/app/static
       # Persistance des données
       - ./data:/app/data
       - ./data/covers:/app/data/covers

@@ -568,6 +568,8 @@ function switchTab(tabName) {
         loadEbdzConfig();
     } else if (tabName === 'prowlarr') {
         loadProwlarrSettings();
+    } else if (tabName === 'qbittorrent') {
+        loadQbittorrentSettings();
     } else if (tabName === 'badges') {
         initBadgeColorPickers();
     } else if (tabName === 'monitoring') {

@@ -102,6 +102,7 @@ if __name__ == '__main__':
     print("Gestionnaire Multi-Bibliothèques Manga")
     print("=" * 60)
     print("Accédez à http://localhost:5000")
+    print("Écoute sur IPv4 et IPv6")
     print("=" * 60)
     
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(debug=True, host='::', port=5000, use_reloader=False)

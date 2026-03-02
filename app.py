@@ -4,6 +4,7 @@ Point d'entrée principal de l'application Manga Manager
 from flask import Flask, send_from_directory
 from config import config
 import os
+import sys
 from encryption import ensure_encryption_key
 
 def create_app(config_name='default'):
@@ -96,13 +97,20 @@ def create_app(config_name='default'):
 
 
 if __name__ == '__main__':
-    app = create_app('development')
+    # Déterminer le mode (développement ou production)
+    # FLASK_ENV peut être: development ou production (défaut: development)
+    config_name = os.getenv('FLASK_ENV', 'development')
+    
+    app = create_app(config_name)
+    
+    debug_mode = config_name == 'development'
     
     print("=" * 60)
     print("Gestionnaire Multi-Bibliothèques Manga")
     print("=" * 60)
+    print(f"Mode: {config_name.upper()}")
     print("Accédez à http://localhost:5000")
     print("Écoute sur IPv4 et IPv6")
     print("=" * 60)
     
-    app.run(debug=True, host='::', port=5000, use_reloader=False)
+    app.run(debug=debug_mode, host='::', port=5000, use_reloader=False)

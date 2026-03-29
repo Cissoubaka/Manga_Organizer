@@ -4,6 +4,7 @@ Flask-WTF==1.2.1
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 Flask-Limiter==3.7.0
+Flask-Caching==2.1.0
 Pillow==12.1.0
 PyPDF2==3.0.1
 rarfile==4.1

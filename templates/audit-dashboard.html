@@ -1,0 +1,170 @@
+<!-- Audit Dashboard Page -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Dashboard - Manga Organizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-audit-dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <h1 class="navbar-brand">📊 Audit Dashboard</h1>
+            <div class="navbar-right">
+                <span id="current-user" class="user-info"></span>
+                <button id="logout-btn" class="btn btn-small">Déconnexion</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><a href="/" onclick="goToPage('/')">🏠 Accueil</a></li>
+                    <li><a href="/auth/users" onclick="goToPage('/auth/users')">👥 Utilisateurs</a></li>
+                    <li><a href="#" class="active">📊 Audit Dashboard</a></li>
+                    <li><a href="#monitor" onclick="showSection('monitor')">📡 Monitor Live</a></li>
+                    <li><a href="#export" onclick="showSection('export')">📥 Export</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-content">
+            <!-- Controls Section -->
+            <section class="controls-section">
+                <div class="control-group">
+                    <label for="days-selector">Période:</label>
+                    <select id="days-selector" onchange="updateDashboard()">
+                        <option value="1">Dernier jour</option>
+                        <option value="7" selected>7 derniers jours</option>
+                        <option value="30">30 derniers jours</option>
+                        <option value="90">90 derniers jours</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button onclick="refreshDashboard()" class="btn btn-primary">🔄 Actualiser</button>
+                    <button onclick="openExport()" class="btn btn-secondary">📥 Exporter</button>
+                </div>
+            </section>
+
+            <!-- Quick Stats Section -->
+            <section class="quick-stats-section">
+                <h2>📈 Vue d'ensemble</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-events">-</div>
+                        <div class="stat-label">Événements Total</div>
+                    </div>
+                    <div class="stat-card alert">
+                        <div class="stat-value" id="stat-failed-logins">-</div>
+                        <div class="stat-label">Tentatives échouées</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-users">-</div>
+                        <div class="stat-label">Utilisateurs uniques</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-ips">-</div>
+                        <div class="stat-label">Adresses IP</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-user-creates">-</div>
+                        <div class="stat-label">Utilisateurs créés</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-user-deletes">-</div>
+                        <div class="stat-label">Utilisateurs supprimés</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="charts-grid">
+                    <!-- Activity Trend Chart -->
+                    <div class="chart-container">
+                        <h3>📊 Tendance d'activité</h3>
+                        <canvas id="activity-trend-chart"></canvas>
+                    </div>
+
+                    <!-- Failed Login Attempts Chart -->
+                    <div class="chart-container">
+                        <h3>⚠️ Tentatives de connexion échouées</h3>
+                        <canvas id="failed-login-chart"></canvas>
+                    </div>
+
+                    <!-- Action Distribution Chart -->
+                    <div class="chart-container">
+                        <h3>🎯 Distribution des actions</h3>
+                        <canvas id="action-distribution-chart"></canvas>
+                    </div>
+
+                    <!-- User Activity Chart -->
+                    <div class="chart-container">
+                        <h3>👥 Top utilisateurs</h3>
+                        <canvas id="user-activity-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- IP Statistics Section -->
+            <section class="ip-section">
+                <h2>🌐 Statistiques par adresse IP</h2>
+                <div class="table-container">
+                    <table id="ip-stats-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Adresse IP</th>
+                                <th>Nombre d'événements</th>
+                                <th>Pourcentage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ip-stats-body">
+                            <tr><td colspan="3" class="loading">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Recent Activity Section -->
+            <section class="activity-section">
+                <h2>⏱️ Activité récente</h2>
+                <div class="table-container">
+                    <table id="activity-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Utilisateur</th>
+                                <th>Action</th>
+                                <th>IP</th>
+                                <th>Niveau</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activity-body">
+                            <tr><td colspan="5" class="loading">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Loading Indicator -->
+            <div id="loading-spinner" class="loading-spinner hidden">
+                <div class="spinner"></div>
+                <p>Chargement...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Chart.js Script -->
+    <script src="{{ url_for('static', filename='js/audit-dashboard.js') }}"></script>
+</body>
+</html>

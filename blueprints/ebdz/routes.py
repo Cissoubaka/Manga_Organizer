@@ -2,11 +2,13 @@
 Routes pour le scraper ebdz.net
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import ebdz_bp
 import json
 import os
 import sqlite3
 from encryption import encrypt, decrypt, ensure_encryption_key
+from datetime import datetime
 
 
 def load_ebdz_config():
@@ -36,15 +38,14 @@ def save_ebdz_config(config):
         config_to_save = config.copy()
         
         # Chiffrer le mot de passe avant la sauvegarde
-        if config_to_save.get('password'):
-            # Enlever le flag _decrypted temporaire aux fins de sauvegarde
-            if 'password_decrypted' in config_to_save:
-                # Utiliser le mot de passe déchiffré pour le chiffrer à nouveau
-                config_to_save['password'] = encrypt(config_to_save['password_decrypted'])
-                del config_to_save['password_decrypted']
-            else:
-                # Le mot de passe est déjà en clair, le chiffrer
-                config_to_save['password'] = encrypt(config_to_save['password'])
+        # Gérer le cas où password_decrypted est présent (nouveau mot de passe) ou password est présent (existant)
+        if 'password_decrypted' in config_to_save:
+            # Utiliser le mot de passe déchiffré pour le chiffrer
+            config_to_save['password'] = encrypt(config_to_save['password_decrypted'])
+            del config_to_save['password_decrypted']
+        elif config_to_save.get('password'):
+            # Le mot de passe est déjà chiffré, le laisser tel quel
+            pass
         
         with open(config_file, 'w') as f:
             json.dump(config_to_save, f, indent=4)
@@ -54,7 +55,72 @@ def save_ebdz_config(config):
         return False
 
 
+def log_scrape_history(forums_data):
+    """
+    Enregistre un nouveau scraping dans l'historique
+    
+    Args:
+        forums_data: Liste de dictionnaires contenant {category: str, new_links: int}
+    """
+    history_file = current_app.config['EBDZ_SCRAPE_HISTORY_FILE']
+    
+    try:
+        # Charger l'historique existant
+        history = []
+        if os.path.exists(history_file):
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+        
+        # Créer une nouvelle entrée
+        new_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'forums': forums_data,
+            'total_new_links': sum(f['new_links'] for f in forums_data)
+        }
+        
+        # Ajouter à l'historique
+        history.append(new_entry)
+        
+        # Sauvegarder
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=4, ensure_ascii=False)
+        
+        return True
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+        return False
+
+
+def get_scrape_history(limit=None):
+    """
+    Récupère l'historique des scrapages
+    
+    Args:
+        limit: Nombre maximum d'entrées à retourner (None = tout)
+    
+    Returns:
+        Liste des scrapages avec dates et détails
+    """
+    history_file = current_app.config['EBDZ_SCRAPE_HISTORY_FILE']
+    
+    try:
+        if not os.path.exists(history_file):
+            return []
+        
+        with open(history_file, 'r') as f:
+            history = json.load(f)
+        
+        # Retourner l'historique en ordre inverse (plus récent d'abord)
+        if limit:
+            return list(reversed(history))[:limit]
+        return list(reversed(history))
+    except Exception as e:
+        print(f"Erreur lors de la lecture de l'historique: {e}")
+        return []
+
+
 @ebdz_bp.route('/config', methods=['GET', 'POST'])
+@login_required
 def ebdz_config():
     """Configuration ebdz.net"""
     
@@ -102,6 +168,7 @@ def ebdz_config():
 
 
 @ebdz_bp.route('/scrape', methods=['POST'])
+@login_required
 def scrape():
     """Lance le scraper ebdz.net"""
     
@@ -174,6 +241,7 @@ def scrape():
 
 
 @ebdz_bp.route('/auto-scrape/config', methods=['GET', 'POST'])
+@login_required
 def auto_scrape_config():
     """Configuration du scraping automatique EBDZ"""
     
@@ -209,6 +277,9 @@ def auto_scrape_config():
                 # Gérer le scheduler
                 if enabled:
                     from .scheduler import ebdz_scheduler
+                    # S'assurer que le scheduler a l'app initialisée
+                    if not ebdz_scheduler.app:
+                        ebdz_scheduler.init_app(current_app)
                     ebdz_scheduler.add_job(interval, interval_unit)
                 else:
                     from .scheduler import ebdz_scheduler
@@ -223,6 +294,7 @@ def auto_scrape_config():
 
 
 @ebdz_bp.route('/auto-scrape/status', methods=['GET'])
+@login_required
 def auto_scrape_status():
     """Récupérer le statut du scraping automatique"""
     try:
@@ -244,3 +316,46 @@ def auto_scrape_status():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ebdz_bp.route('/scrape/history', methods=['GET'])
+@login_required
+def scrape_history():
+    """Récupérer l'historique des scrapages EBDZ"""
+    try:
+        limit = request.args.get('limit', type=int, default=None)
+        history = get_scrape_history(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'history': history,
+            'count': len(history)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ebdz_bp.route('/auto-scrape/test', methods=['POST'])
+@login_required
+def test_auto_scrape():
+    """Force l'exécution immédiate du scraping automatique (pour test)"""
+    try:
+        from .scheduler import ebdz_scheduler
+        
+        # S'assurer que le scheduler a l'app
+        if not ebdz_scheduler.app:
+            ebdz_scheduler.init_app(current_app)
+        
+        # Exécuter le scraping immédiatement
+        print("\n🕷️ [TEST] Scraping automatique forcé...")
+        ebdz_scheduler._scrape_ebdz()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Scraping automatique exécuté. Vérifiez les logs.'
+        })
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': error_msg}), 500

@@ -2,6 +2,7 @@
 Routes pour l'intégration eMule/aMule
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import emule_bp
 import json
 import os
@@ -55,6 +56,7 @@ def save_emule_config(config):
 
 
 @emule_bp.route('/config', methods=['GET', 'POST'])
+@login_required
 def emule_config():
     """Configuration eMule"""
     
@@ -95,6 +97,7 @@ def emule_config():
 
 
 @emule_bp.route('/add', methods=['POST'])
+@login_required
 def add_to_emule():
     """Ajoute un lien ED2K à eMule"""
     
@@ -130,6 +133,7 @@ def add_to_emule():
 
 
 @emule_bp.route('/test', methods=['GET'])
+@login_required
 def test_connection():
     """Test la connexion à eMule"""
     

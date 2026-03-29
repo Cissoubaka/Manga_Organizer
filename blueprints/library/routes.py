@@ -2,6 +2,7 @@
 Routes pour la gestion des bibliothèques
 """
 from flask import render_template, request, jsonify, current_app
+from flask_login import login_required
 from . import library_bp
 from .scanner import LibraryScanner
 import sqlite3
@@ -21,36 +22,42 @@ def get_db_connection():
 # ========== ROUTES HTML ==========
 
 @library_bp.route('/nautiljon')
+@login_required
 def nautiljon_page():
     """Page d'enrichissement Nautiljon"""
     return render_template('nautiljon.html')
 
 
 @library_bp.route('/')
+@login_required
 def index():
     """Page d'accueil - Liste des bibliothèques"""
     return render_template('index.html')
 
 
 @library_bp.route('/library/<int:library_id>')
+@login_required
 def library_detail(library_id):
     """Détails d'une bibliothèque"""
     return render_template('library.html', library_id=library_id)
 
 
 @library_bp.route('/import')
+@login_required
 def import_page():
     """Page d'import de mangas"""
     return render_template('import.html')
 
 
 @library_bp.route('/transfer')
+@login_required
 def transfer_page():
     """Page de transfert de séries entre bibliothèques"""
     return render_template('transfer.html')
 
 
 @library_bp.route('/missing-monitor')
+@login_required
 def missing_monitor_page():
     """Page de surveillance des volumes manquants"""
     return render_template('missing-monitor.html')
@@ -59,6 +66,7 @@ def missing_monitor_page():
 # ========== API ==========
 
 @library_bp.route('/api/libraries', methods=['GET', 'POST'])
+@login_required
 def libraries():
     """Liste ou crée des bibliothèques"""
     
@@ -132,6 +140,7 @@ def libraries():
 
 
 @library_bp.route('/api/libraries/<int:library_id>', methods=['GET', 'DELETE'])
+@login_required
 def library_operations(library_id):
     """Récupère ou supprime une bibliothèque"""
     
@@ -184,6 +193,7 @@ def library_operations(library_id):
 
 
 @library_bp.route('/api/scan/<int:library_id>', methods=['GET', 'POST'])
+@login_required
 def scan_library(library_id):
     """Scanne une bibliothèque (détecte séries et volumes, sans enrichissement)"""
     
@@ -230,6 +240,7 @@ def scan_library(library_id):
 
 
 @library_bp.route('/api/scan/series/<int:series_id>', methods=['POST'])
+@login_required
 def scan_series(series_id):
     """Scanne une seule série (met à jour ses volumes)"""
     
@@ -249,6 +260,7 @@ def scan_series(series_id):
 
 
 @library_bp.route('/api/library/<int:library_id>/enrich', methods=['POST'])
+@login_required
 def enrich_library(library_id):
     """Enrichit toutes les séries sans infos Nautiljon d'une bibliothèque"""
     try:
@@ -322,6 +334,7 @@ def enrich_library(library_id):
 
 
 @library_bp.route('/api/series/<int:series_id>/volumes', methods=['GET'])
+@login_required
 def get_series_volumes(series_id):
     """Récupère tous les volumes d'une série"""
     
@@ -343,6 +356,7 @@ def get_series_volumes(series_id):
     return jsonify(volumes)
 
 @library_bp.route('/api/library/<int:library_id>/series')
+@login_required
 def get_library_series(library_id):
     try:
         conn = sqlite3.connect(current_app.config['DATABASE'])
@@ -382,6 +396,7 @@ def get_library_series(library_id):
         return jsonify({'error': str(e)}), 500
 
 @library_bp.route('/api/series/<int:series_id>')
+@login_required
 def get_series_details(series_id):
     try:
         conn = sqlite3.connect(current_app.config['DATABASE'])
@@ -465,6 +480,7 @@ def get_series_details(series_id):
         return jsonify({'error': str(e)}), 500
 
 @library_bp.route('/api/series/<int:series_id>/toggle-oneshot', methods=['POST'])
+@login_required
 def toggle_series_oneshot(series_id):
     """Bascule le statut one-shot d'une série"""
     try:
@@ -507,6 +523,7 @@ def toggle_series_oneshot(series_id):
         return jsonify({'error': str(e)}), 500
 
 @library_bp.route('/api/library/<int:library_id>/stats')
+@login_required
 def get_library_stats_route(library_id):
     """Récupère les statistiques détaillées d'une bibliothèque"""
     try:
@@ -559,6 +576,7 @@ def get_library_stats_route(library_id):
         return jsonify({'error': str(e)}), 500
 
 @library_bp.route('/api/libraries/<int:library_id>')
+@login_required
 def get_library_info(library_id):
     """Récupère les informations d'une bibliothèque spécifique"""
     try:
@@ -592,6 +610,7 @@ def get_library_info(library_id):
     ###### ROUTE IMPORT ########
 
 @library_bp.route('/api/import/scan', methods=['POST'])
+@login_required
 def scan_import_directory():
     """Scanne un répertoire pour trouver les fichiers à importer"""
     data = request.json
@@ -638,6 +657,7 @@ def scan_import_directory():
         return jsonify({'error': str(e)}), 500
 
 @library_bp.route('/api/import/execute', methods=['POST'])
+@login_required
 def execute_import():
     """Exécute l'import des fichiers vers leurs destinations"""
     import uuid
@@ -962,6 +982,7 @@ def execute_import():
 # ========== ROUTES DE TRANSFERT DE SÉRIES ==========
 
 @library_bp.route('/api/transfer/series/<int:library_id>', methods=['GET'])
+@login_required
 def get_transfer_series(library_id):
     """Récupère les séries d'une bibliothèque pour le transfert"""
     conn = get_db_connection()
@@ -1026,6 +1047,7 @@ def get_transfer_series(library_id):
 
 
 @library_bp.route('/api/transfer/move', methods=['POST'])
+@login_required
 def move_series():
     """Transfère une série d'une bibliothèque à une autre (fichiers + BD)"""
     data = request.get_json()
@@ -1150,6 +1172,7 @@ def move_series():
 
 
 @library_bp.route('/api/series/<int:series_id>/tags', methods=['GET', 'PUT'])
+@login_required
 def manage_series_tags(series_id):
     """Récupère ou met à jour les tags d'une série"""
     
@@ -1245,6 +1268,7 @@ def cleanup_empty_directories(base_path):
     return deleted_count
 
 @library_bp.route('/api/import/cleanup', methods=['POST'])
+@login_required
 def cleanup_import_directory():
     """Nettoie les répertoires vides du répertoire d'import"""
     data = request.json
@@ -1270,6 +1294,7 @@ def cleanup_import_directory():
 # ========== RENOMMAGE DE FICHIERS ==========
 
 @library_bp.route('/api/series/<int:series_id>/rename/preview', methods=['POST'])
+@login_required
 def preview_rename(series_id):
     """Génère un aperçu du renommage avant de l'effectuer"""
     try:
@@ -1342,6 +1367,7 @@ def preview_rename(series_id):
 
 
 @library_bp.route('/api/series/<int:series_id>/rename/execute', methods=['POST'])
+@login_required
 def execute_rename(series_id):
     """Effectue le renommage des fichiers de la série"""
     try:
@@ -1405,6 +1431,7 @@ def execute_rename(series_id):
 
 
 @library_bp.route('/api/libraries/<int:library_id>/create-series', methods=['POST'])
+@login_required
 def create_series_directory(library_id):
     """Crée un répertoire pour une nouvelle série dans une bibliothèque"""
     try:
@@ -1878,6 +1905,7 @@ def execute_auto_import(files_to_import, import_base_path):
 # ========== ROUTES API D'IMPORT AUTOMATIQUE ==========
 
 @library_bp.route('/api/import/config', methods=['GET', 'POST'])
+@login_required
 def import_config():
     """Récupère ou met à jour la configuration d'import automatique"""
     
@@ -1919,6 +1947,7 @@ def import_config():
 # ========== ROUTES API D'HISTORIQUE D'IMPORT ==========
 
 @library_bp.route('/api/import/history', methods=['GET'])
+@login_required
 def import_history():
     """Récupère l'historique des imports"""
     try:
@@ -1933,6 +1962,7 @@ def import_history():
 
 
 @library_bp.route('/api/import/history/<operation_id>', methods=['GET'])
+@login_required
 def import_operation_details(operation_id):
     """Récupère les détails d'une opération d'import"""
     try:
@@ -1949,6 +1979,7 @@ def import_operation_details(operation_id):
 
 
 @library_bp.route('/api/import/history/<operation_id>/undo', methods=['POST'])
+@login_required
 def undo_import_operation(operation_id):
     """Annule une opération d'import"""
     try:

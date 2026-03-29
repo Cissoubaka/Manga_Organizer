@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Connexion - Manga Organizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .login-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .info-message {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .demo-credentials {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🔐 Manga Organizer</h1>
+            <p>Connexion à votre compte</p>
+        </div>
+
+        <div id="error-message" class="error-message"></div>
+
+        <div class="info-message">
+            🔒 Authentification requise pour accéder à l'application
+        </div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Nom d'utilisateur</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    placeholder="admin"
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password"
+                    placeholder="••••••••"
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+
+            <button type="submit" id="login-btn" class="login-button">
+                Connexion
+            </button>
+        </form>
+
+        <div class="demo-credentials">
+            <strong>Identifiants de démo:</strong><br>
+            Login: <code>admin</code><br>
+            Password: <code>admin123</code>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form')
+        const usernameInput = document.getElementById('username')
+        const passwordInput = document.getElementById('password')
+        const loginBtn = document.getElementById('login-btn')
+        const errorDiv = document.getElementById('error-message')
+
+        // Afficher un message d'erreur
+        function showError(message) {
+            errorDiv.textContent = message
+            errorDiv.classList.add('show')
+        }
+
+        // Masquer le message d'erreur
+        function hideError() {
+            errorDiv.classList.remove('show')
+        }
+
+        // Récupérer le paramètre 'next' de l'URL
+        function getNextUrl() {
+            const params = new URLSearchParams(window.location.search)
+            return params.get('next') || '/'
+        }
+
+        // Gérer la soumission du formulaire
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            hideError()
+
+            const username = usernameInput.value.trim()
+            const password = passwordInput.value
+
+            if (!username || !password) {
+                showError('Veuillez entrer vos identifiants')
+                return
+            }
+
+            // Désactiver le bouton pendant la requête
+            loginBtn.disabled = true
+            const originalText = loginBtn.textContent
+            loginBtn.innerHTML = '<span class="loading">⏳</span> Connexion...'
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                })
+
+                const data = await response.json()
+
+                if (data.success) {
+                    // Login réussi - redirection
+                    console.log('✓ Connexion réussie:', data.user.username)
+                    const nextUrl = getNextUrl()
+                    window.location.href = nextUrl
+                } else {
+                    // Erreur de login
+                    showError(data.error || 'Erreur de connexion')
+                    loginBtn.disabled = false
+                    loginBtn.textContent = originalText
+                    passwordInput.value = ''
+                    passwordInput.focus()
+                }
+            } catch (error) {
+                console.error('Erreur:', error)
+                showError('Erreur serveur: ' + error.message)
+                loginBtn.disabled = false
+                loginBtn.textContent = originalText
+            }
+        })
+
+        // Focus sur username au chargement
+        usernameInput.focus()
+    </script>
+</body>
+</html>

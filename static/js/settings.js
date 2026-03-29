@@ -566,6 +566,7 @@ function switchTab(tabName) {
         loadSettings();
     } else if (tabName === 'ebdz') {
         loadEbdzConfig();
+        loadEbdzHistory();
     } else if (tabName === 'prowlarr') {
         loadProwlarrSettings();
     } else if (tabName === 'qbittorrent') {
@@ -1264,3 +1265,76 @@ function formatNextCheck(date) {
     
     return `Prochaine vérification: ${prefix} à ${timeName}`;
 }
+
+// ===== EBDZ HISTORY =====
+async function loadEbdzHistory() {
+    const container = document.getElementById('ebdzHistoryContainer');
+    
+    try {
+        container.innerHTML = '<div style="text-align: center; padding: 30px; color: #999;"><p>⏳ Chargement...</p></div>';
+        
+        const response = await fetch('/api/ebdz/scrape/history');
+        const data = await response.json();
+        
+        if (!data.success) {
+            container.innerHTML = `<div class="ebdz-history-empty">❌ Erreur: ${data.error}</div>`;
+            return;
+        }
+        
+        if (!data.history || data.history.length === 0) {
+            container.innerHTML = '<div class="ebdz-history-empty">📭 Aucun historique de scraping pour le moment</div>';
+            return;
+        }
+        
+        // Créer le tableau
+        let html = '<table class="ebdz-history-table"><thead><tr>';
+        html += '<th>📅 Date et heure</th>';
+        html += '<th>📂 Forums scrapés</th>';
+        html += '<th style="text-align: center;">✨ Nouveaux liens</th>';
+        html += '</tr></thead><tbody>';
+        
+        data.history.forEach(entry => {
+            const timestamp = new Date(entry.timestamp);
+            const formattedDate = timestamp.toLocaleDateString('fr-FR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            // Créer les badges des forums
+            let forumsHtml = '';
+            if (entry.forums && entry.forums.length > 0) {
+                forumsHtml = entry.forums.map(forum => 
+                    `<div class="ebdz-forum-item">
+                        <span class="ebdz-forum-category">${forum.category}</span>
+                        <span class="ebdz-forum-count">+${forum.new_links}</span>
+                    </div>`
+                ).join('');
+            }
+            
+            html += '<tr>';
+            html += `<td class="ebdz-history-timestamp">${formattedDate}</td>`;
+            html += `<td class="ebdz-history-forums">${forumsHtml}</td>`;
+            html += `<td style="text-align: center;"><span class="ebdz-history-count">+${entry.total_new_links}</span></td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        container.innerHTML = `<div class="ebdz-history-empty">❌ Erreur de chargement: ${error.message}</div>`;
+    }
+}
+
+
+// Charger l'historique au démarrage si on est dans l'onglet EBDZ
+window.addEventListener('load', () => {
+    const ebdzTab = document.getElementById('tab-ebdz');
+    if (ebdzTab && ebdzTab.classList.contains('active')) {
+        loadEbdzHistory();
+    }
+});

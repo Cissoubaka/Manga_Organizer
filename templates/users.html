@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Gestion des Utilisateurs - Manga Organizer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style-settings.css">
+    <style>
+        .users-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .users-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .users-header h1 {
+            margin: 0;
+            color: #333;
+        }
+
+        .btn-create {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-create:hover {
+            background-color: #45a049;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .users-table thead {
+            background-color: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .users-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .users-table td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .users-table tbody tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .user-id {
+            font-family: monospace;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .admin-badge.true {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .admin-badge.false {
+            background-color: #ccc;
+            color: #666;
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-action {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background-color: #0b7dda;
+        }
+
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background-color: #da190b;
+        }
+
+        .btn-reset-pwd {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .btn-reset-pwd:hover {
+            background-color: #e68900;
+        }
+
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-disabled:hover {
+            background-color: inherit;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 4px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+        }
+
+        .modal-close {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-group input {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #c3e6cb;
+        }
+
+        .loading {
+            display: inline-block;
+            opacity: 0.6;
+        }
+
+        .no-users {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .user-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation verticale -->
+        <div class="sidebar-nav">
+            <a href="/" class="nav-link">📚 Bibliothèques</a>
+            <a href="/import" class="nav-link">📥 Import</a>
+            <a href="/discover" class="nav-link">🎯 Découvrir</a>
+            <a href="/search" class="nav-link">🔍 Recherche</a>
+            <a href="/transfer" class="nav-link">↔️ Transfer</a>
+            <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
+            <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
+            <a href="/settings" class="nav-link">⚙️ Configuration</a>
+            <a href="/users" class="nav-link active">👥 Utilisateurs</a>
+        </div>
+
+        <div class="main-wrapper">
+            <header>
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>👥 Gestion des Utilisateurs</h1>
+                        <p class="subtitle">Gérez les utilisateurs de l'application</p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="content">
+        <div class="users-header">
+            <h1>👥 Gestion des Utilisateurs</h1>
+            <button class="btn-create" onclick="openCreateModal()">+ Nouvel Utilisateur</button>
+        </div>
+
+        <div class="user-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-users">0</div>
+                <div class="stat-label">Utilisateurs totaux</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="admin-users">0</div>
+                <div class="stat-label">Administrateurs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="normal-users">0</div>
+                <div class="stat-label">Utilisateurs normaux</div>
+            </div>
+        </div>
+
+        <div id="error-container"></div>
+        <div id="success-container"></div>
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom d'utilisateur</th>
+                    <th>Statut</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody">
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 40px; color: #999;">
+                        Chargement des utilisateurs...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Créer Utilisateur -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Créer un nouvel utilisateur</h2>
+                <span class="modal-close" onclick="closeCreateModal()">&times;</span>
+            </div>
+            <div id="create-error" class="error-message" style="display: none;"></div>
+            <form id="createForm" onsubmit="handleCreateUser(event)">
+                <div class="form-group">
+                    <label for="username">Nom d'utilisateur</label>
+                    <input type="text" id="username" name="username" required placeholder="minuscules, 3-32 caractères">
+                </div>
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" name="password" required placeholder="minimum 8 caractères">
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="is_admin" name="is_admin">
+                    <label for="is_admin" style="margin-bottom: 0;">Administrateur</label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeCreateModal()">Annuler</button>
+                    <button type="submit" class="btn-primary">Créer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Éditer Utilisateur -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Éditer utilisateur</h2>
+                <span class="modal-close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <div id="edit-error" class="error-message" style="display: none;"></div>
+            <form id="editForm" onsubmit="handleEditUser(event)">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label>Nom d'utilisateur:</label>
+                    <p id="edit-username" style="padding: 8px; margin: 0; background: #f5f5f5; border-radius: 3px;"></p>
+                </div>
+                <div class="form-group">
+                    <label for="edit-is-admin" style="margin-bottom: 10px;">Permissions d'administrateur</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="edit-is-admin" name="is_admin">
+                        <label for="edit-is-admin" style="margin-bottom: 0;">Cet utilisateur est administrateur</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Annuler</button>
+                    <button type="submit" class="btn-primary">Sauvegarder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Réinitialiser Mot de Passe -->
+    <div id="resetPwdModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Réinitialiser le mot de passe</h2>
+                <span class="modal-close" onclick="closeResetPwdModal()">&times;</span>
+            </div>
+            <div id="reset-error" class="error-message" style="display: none;"></div>
+            <form id="resetPwdForm" onsubmit="handleResetPassword(event)">
+                <input type="hidden" id="reset-user-id">
+                <div class="form-group">
+                    <label for="reset-username" style="margin-bottom: 10px;">Utilisateur:</label>
+                    <p id="reset-username" style="padding: 8px; margin: 0; background: #f5f5f5; border-radius: 3px;"></p>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">Nouveau mot de passe</label>
+                    <input type="password" id="new-password" name="password" required placeholder="minimum 8 caractères">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeResetPwdModal()">Annuler</button>
+                    <button type="submit" class="btn-primary">Réinitialiser</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Supprimer Utilisateur -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirmer la suppression</h2>
+                <span class="modal-close" onclick="closeDeleteModal()">&times;</span>
+            </div>
+            <p id="delete-message" style="color: #333; margin: 20px 0;"></p>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Annuler</button>
+                <button type="button" class="btn-delete" onclick="confirmDelete()">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/nav.js"></script>
+    <script src="/static/js/users.js"></script>
+</body>
+</html>

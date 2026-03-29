@@ -86,8 +86,24 @@ class EBDZScheduler:
                     print("⚠️ Configuration EBDZ incomplète, scraping annulé")
                     return
                 
+                # Compter les liens AVANT le scraping
+                links_before = {}
+                try:
+                    conn = sqlite3.connect(current_app.config['DB_FILE'])
+                    cursor = conn.cursor()
+                    for forum_cfg in all_forums:
+                        category = forum_cfg['category']
+                        cursor.execute('SELECT COUNT(*) FROM ed2k_links WHERE forum_category = ?', (category,))
+                        count = cursor.fetchone()[0]
+                        links_before[category] = count
+                    conn.close()
+                except Exception as e:
+                    print(f"Erreur lors du comptage initial des liens: {e}")
+                    links_before = {f['category']: 0 for f in all_forums}
+                
                 total_links = 0
                 forums_scraped = 0
+                forums_data = []  # Pour l'historique
                 
                 for forum_cfg in all_forums:
                     fid = forum_cfg['fid']
@@ -109,18 +125,41 @@ class EBDZScheduler:
                     scraper.run(max_pages=max_pages)
                     forums_scraped += 1
                     
-                    # Compter les liens
+                    # Compter les liens APRÈS le scraping et calculer les nouveaux
                     try:
                         conn = sqlite3.connect(current_app.config['DB_FILE'])
                         cursor = conn.cursor()
                         cursor.execute('SELECT COUNT(*) FROM ed2k_links WHERE forum_category = ?', (category,))
-                        count = cursor.fetchone()[0]
-                        total_links += count
+                        count_after = cursor.fetchone()[0]
+                        total_links += count_after
+                        
+                        # Calculer les nouveaux liens
+                        count_before = links_before.get(category, 0)
+                        new_links = max(0, count_after - count_before)
+                        
+                        forums_data.append({
+                            'category': category,
+                            'new_links': new_links,
+                            'total_links': count_after
+                        })
+                        
+                        print(f"    ✓ {category}: +{new_links} nouveaux liens ({count_after} au total)")
+                        
                         conn.close()
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"    Erreur lors du comptage des liens: {e}")
+                        forums_data.append({
+                            'category': category,
+                            'new_links': 0,
+                            'total_links': 0
+                        })
                 
                 print(f"✓ Scraping EBDZ terminé: {forums_scraped} forum(s), {total_links} lien(s)")
+                
+                # Enregistrer dans l'historique
+                if forums_data:
+                    routes.log_scrape_history(forums_data)
+                    print(f"✓ Historique enregistré")
                 
             except Exception as e:
                 print(f"✗ Erreur lors du scraping automatique EBDZ: {e}")

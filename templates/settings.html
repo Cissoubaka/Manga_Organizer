@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Configuration</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style-settings.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -19,6 +20,7 @@
             <a href="/nautiljon" class="nav-link">🌊 Nautiljon</a>
             <a href="/missing-monitor" class="nav-link">📊 Surveillance</a>
             <a href="/settings" class="nav-link active">⚙️ Configuration</a>
+            <a href="/users" class="nav-link">👥 Utilisateurs</a>
         </div>
 
         <div class="main-wrapper">
@@ -307,6 +309,26 @@
                                 </button>
                             </div>
                             <div id="ebdzAutoMessage" class="message"></div>
+                        </div>
+
+                        <!-- Historique des scrapages -->
+                        <div class="settings-card" style="margin-top: 30px;">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <span style="font-size: 24px;">📊</span>
+                                <h3 style="color: #333; margin: 0;">Historique des scrapages</h3>
+                            </div>
+
+                            <div id="ebdzHistoryContainer" style="margin-bottom: 20px;">
+                                <div style="text-align: center; padding: 30px; color: #999;">
+                                    <p>⏳ Chargement de l'historique...</p>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-success" onclick="loadEbdzHistory()">
+                                    🔄 Actualiser l'historique
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Aide -->
@@ -896,5 +918,13 @@
 
     <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
     <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script>
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAuthSystem);
+        } else {
+            initAuthSystem();
+        }
+    </script>
 </body>
 </html>

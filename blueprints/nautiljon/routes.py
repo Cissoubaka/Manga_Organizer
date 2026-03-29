@@ -2,6 +2,7 @@
 Routes pour l'intégration Nautiljon
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import nautiljon_bp
 from .scraper import NautiljonScraper, NautiljonDatabase
 import sqlite3
@@ -19,6 +20,7 @@ def get_db_connection():
 
 
 @nautiljon_bp.route('/search', methods=['GET'])
+@login_required
 def search_nautiljon():
     """
     Recherche un manga sur Nautiljon
@@ -48,6 +50,7 @@ def search_nautiljon():
 
 
 @nautiljon_bp.route('/info', methods=['GET'])
+@login_required
 def get_nautiljon_info():
     """
     Récupère les infos détaillées d'un manga
@@ -87,6 +90,7 @@ def get_nautiljon_info():
 
 
 @nautiljon_bp.route('/search-results/<int:series_id>', methods=['GET'])
+@login_required
 def get_search_results_for_series(series_id):
     """
     Cherche tous les résultats pour une série et montre les infos de chaque
@@ -158,6 +162,7 @@ def get_search_results_for_series(series_id):
 
 
 @nautiljon_bp.route('/enrich/<int:series_id>', methods=['POST'])
+@login_required
 def enrich_series(series_id):
     """
     Enrichit une série avec les infos Nautiljon
@@ -273,6 +278,7 @@ def enrich_series(series_id):
 
 
 @nautiljon_bp.route('/series/<int:series_id>', methods=['GET'])
+@login_required
 def get_series_nautiljon_info(series_id):
     """Récupère les infos Nautiljon d'une série"""
     try:
@@ -310,6 +316,7 @@ def get_series_nautiljon_info(series_id):
 
 
 @nautiljon_bp.route('/batch-enrich', methods=['POST'])
+@login_required
 def batch_enrich_series():
     """
     Enrichit plusieurs séries avec les infos Nautiljon
@@ -398,6 +405,7 @@ def batch_enrich_series():
 
 
 @nautiljon_bp.route('/diagnostic', methods=['GET'])
+@login_required
 def diagnostic():
     """Route de diagnostic pour vérifier l'état de la base de données"""
     try:

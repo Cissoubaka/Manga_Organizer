@@ -1,0 +1,194 @@
+<!-- Export & Reporting Page -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export & Reporting - Audit Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-audit-export.css') }}">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <h1 class="navbar-brand">📥 Export & Reporting</h1>
+            <div class="navbar-right">
+                <span id="current-user" class="user-info"></span>
+                <button id="logout-btn" class="btn btn-small">Déconnexion</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="export-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <h3>Sections</h3>
+                <ul>
+                    <li><a href="/audit/dashboard">📊 Dashboard</a></li>
+                    <li><a href="/audit/monitor">📡 Monitor Live</a></li>
+                    <li><a href="#" class="active">📥 Export</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-info">
+                <h3>Aide</h3>
+                <ul style="list-style: none; padding: 0; font-size: 12px;">
+                    <li>✓ CSV: Excel</li>
+                    <li>✓ JSON: API</li>
+                    <li>✓ PDF: Rapport</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="export-content">
+            <!-- Filter Panel -->
+            <section class="filter-panel">
+                <h2>🔍 Filtres & Options</h2>
+                <div class="filters-grid">
+                    <!-- Date Range -->
+                    <div class="filter-group">
+                        <label for="date-from">De (Date):</label>
+                        <input type="date" id="date-from">
+                    </div>
+                    <div class="filter-group">
+                        <label for="date-to">À (Date):</label>
+                        <input type="date" id="date-to">
+                    </div>
+
+                    <!-- User Filter -->
+                    <div class="filter-group">
+                        <label for="user-filter">Utilisateur:</label>
+                        <select id="user-filter">
+                            <option value="">-- Tous --</option>
+                        </select>
+                    </div>
+
+                    <!-- Action Filter -->
+                    <div class="filter-group">
+                        <label for="action-filter">Action:</label>
+                        <select id="action-filter">
+                            <option value="">-- Tous --</option>
+                        </select>
+                    </div>
+
+                    <!-- IP Filter -->
+                    <div class="filter-group">
+                        <label for="ip-filter">Adresse IP:</label>
+                        <select id="ip-filter">
+                            <option value="">-- Tous --</option>
+                        </select>
+                    </div>
+
+                    <!-- Level Filter -->
+                    <div class="filter-group">
+                        <label for="level-filter">Niveau:</label>
+                        <select id="level-filter">
+                            <option value="">-- Tous --</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Export Format & Action -->
+                <div class="export-options">
+                    <div class="option-group">
+                        <label>Format d'export:</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="format" value="csv" checked> CSV</label>
+                            <label><input type="radio" name="format" value="json"> JSON</label>
+                            <label><input type="radio" name="format" value="pdf"> PDF</label>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button onclick="previewData()" class="btn btn-primary">👁️ Aperçu</button>
+                        <button onclick="downloadReport()" class="btn btn-success">⬇️ Télécharger</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Preview Section -->
+            <section id="preview-section" class="preview-section hidden">
+                <h2>📋 Aperçu des données</h2>
+                <div class="preview-info">
+                    <span>Total enregistrements: <strong id="record-count">0</strong></span>
+                    <span>Affichage: <strong id="preview-count">0</strong> premiers</span>
+                    <button onclick="closePreview()" class="btn btn-small">✕ Fermer</button>
+                </div>
+                <div class="table-container">
+                    <table id="preview-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Utilisateur</th>
+                                <th>Action</th>
+                                <th>IP</th>
+                                <th>Niveau</th>
+                            </tr>
+                        </thead>
+                        <tbody id="preview-body">
+                            <tr><td colspan="5" class="loading">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Stats Section -->
+            <section class="stats-section">
+                <h2>📈 Résumé des données</h2>
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Enregistrements</div>
+                            <div class="stat-value" id="stat-records">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Utilisateurs</div>
+                            <div class="stat-value" id="stat-users">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🌐</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Adresses IP</div>
+                            <div class="stat-value" id="stat-ips">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Durée</div>
+                            <div class="stat-value" id="stat-duration">-</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Exports -->
+            <section class="recent-section">
+                <h2>📁 Exports récents</h2>
+                <div class="downloads-list" id="downloads-list">
+                    <p style="color: #999;">Aucun export récent</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-spinner" class="loading-spinner hidden">
+        <div class="spinner"></div>
+        <p>Traitement...</p>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/audit-export.js') }}"></script>
+</body>
+</html>

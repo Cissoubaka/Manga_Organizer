@@ -1,0 +1,110 @@
+<!-- Live Monitoring Page with WebSocket -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Monitoring - Audit Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-audit-monitor.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <h1 class="navbar-brand">📡 Live Monitoring</h1>
+            <div class="navbar-right">
+                <span id="connection-status" class="connection-status disconnected">● Déconnecté</span>
+                <span id="current-user" class="user-info"></span>
+                <button id="logout-btn" class="btn btn-small">Déconnexion</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="monitor-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <h3>Sections</h3>
+                <ul>
+                    <li><a href="/audit/dashboard">📊 Dashboard</a></li>
+                    <li><a href="#" class="active">📡 Live Monitor</a></li>
+                    <li><a href="/audit/export">📥 Export</a></li>
+                </ul>
+            </div>
+            <div class="sidebar-stats">
+                <h3>Live Stats</h3>
+                <div class="stat-mini">
+                    <span class="stat-label">Événements</span>
+                    <span class="stat-value" id="event-count">0</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-label">Connexions</span>
+                    <span class="stat-value" id="login-count">0</span>
+                </div>
+                <div class="stat-mini">
+                    <span class="stat-label">Alertes</span>
+                    <span class="stat-value alert-badge" id="alert-count">0</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="monitor-content">
+            <!-- Controls -->
+            <section class="monitor-controls">
+                <div class="control-group">
+                    <button onclick="toggleAutoScroll()" class="btn-toggle" id="auto-scroll-btn">
+                        📌 Auto-scroll ON
+                    </button>
+                    <button onclick="clearFeed()" class="btn-toggle">🗑️ Vider</button>
+                    <button onclick="pauseMonitoring()" class="btn-toggle" id="pause-btn">⏸️ Pause</button>
+                </div>
+            </section>
+
+            <!-- Alerts Section -->
+            <section id="alerts-section" class="alerts-section hidden">
+                <h2>⚠️ Alertes Actives</h2>
+                <div id="alerts-container" class="alerts-container">
+                    <!-- Alerts will be added here -->
+                </div>
+            </section>
+
+            <!-- Live Feed -->
+            <section class="feed-section">
+                <h2>📊 Flux en temps réel</h2>
+                <div class="feed-container">
+                    <div id="live-feed" class="live-feed">
+                        <div class="feed-placeholder">
+                            <p>En attente des événements...</p>
+                            <p style="font-size: 24px;">👀</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Statistics -->
+            <section class="stats-section">
+                <h2>📈 Statistiques en direct</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-title">Événements par utilisateur</div>
+                        <div id="user-stats" class="stats-list"></div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-title">Événements par type</div>
+                        <div id="action-stats" class="stats-list"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="{{ url_for('static', filename='js/audit-monitor.js') }}"></script>
+</body>
+</html>

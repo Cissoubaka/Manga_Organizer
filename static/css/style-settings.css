@@ -542,3 +542,90 @@
     
     .badge-config-grid {
         grid-template-columns: 1fr;
+
+/* Styles pour l'historique des scrapages */
+.ebdz-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.ebdz-history-table thead {
+    background: #f8f9fa;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.ebdz-history-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95em;
+}
+
+.ebdz-history-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.ebdz-history-table tbody tr:hover {
+    background-color: #fafafa;
+}
+
+.ebdz-history-table td {
+    padding: 12px;
+    color: #555;
+    font-size: 0.95em;
+}
+
+.ebdz-history-timestamp {
+    font-weight: 500;
+    color: #333;
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.ebdz-history-forums {
+    max-width: 300px;
+}
+
+.ebdz-forum-item {
+    display: inline-block;
+    background: #e8f4f8;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    border-left: 3px solid #2196F3;
+}
+
+.ebdz-forum-category {
+    font-weight: 500;
+    color: #1976d2;
+}
+
+.ebdz-forum-count {
+    color: #666;
+    margin-left: 4px;
+}
+
+.ebdz-history-count {
+    font-weight: 600;
+    color: #4CAF50;
+    text-align: center;
+    background: #e8f5e9;
+    padding: 4px 8px;
+    border-radius: 3px;
+    display: inline-block;
+    min-width: 80px;
+}
+
+.ebdz-history-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+    background: #f9f9f9;
+    border-radius: 5px;
+    font-style: italic;
+}

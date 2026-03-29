@@ -2,6 +2,7 @@
 Routes API pour la surveillance des volumes manquants
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import missing_monitor_bp
 import sqlite3
 import json
@@ -102,6 +103,7 @@ def save_monitor_config(config):
 # ========== ROUTES BIBLIOTHEQUES ==========
 
 @missing_monitor_bp.route('/libraries', methods=['GET'])
+@login_required
 def get_libraries():
     """Liste les bibliothèques avec leur statut de surveillance"""
     
@@ -137,6 +139,7 @@ def get_libraries():
 
 
 @missing_monitor_bp.route('/libraries/<int:library_id>/monitor', methods=['POST'])
+@login_required
 def configure_library_monitor(library_id):
     """Configure la surveillance pour une bibliothèque"""
     
@@ -181,6 +184,7 @@ def configure_library_monitor(library_id):
 
 
 @missing_monitor_bp.route('/libraries/<int:library_id>/series', methods=['GET'])
+@login_required
 def get_library_series(library_id):
     """Récupère les séries d'une bibliothèque"""
     
@@ -226,6 +230,7 @@ def get_library_series(library_id):
 
 
 @missing_monitor_bp.route('/config', methods=['GET', 'POST'])
+@login_required
 def monitor_config():
     """Configuration générale de la surveillance"""
     
@@ -307,6 +312,7 @@ def monitor_config():
 
 
 @missing_monitor_bp.route('/series', methods=['GET'])
+@login_required
 def get_monitored_series():
     """Liste les séries en surveillance"""
     
@@ -327,6 +333,7 @@ def get_monitored_series():
 
 
 @missing_monitor_bp.route('/series/<int:series_id>/monitor', methods=['POST'])
+@login_required
 def configure_series_monitor(series_id):
     """Configure la surveillance pour une série spécifique"""
     
@@ -376,6 +383,7 @@ def configure_series_monitor(series_id):
 
 
 @missing_monitor_bp.route('/search', methods=['POST'])
+@login_required
 def search_volume():
     """Recherche un volume spécifique"""
     
@@ -403,6 +411,7 @@ def search_volume():
 
 
 @missing_monitor_bp.route('/download', methods=['POST'])
+@login_required
 def trigger_download():
     """Envoie un téléchargement au client"""
     
@@ -433,6 +442,7 @@ def trigger_download():
 
 
 @missing_monitor_bp.route('/run-check', methods=['POST'])
+@login_required
 def run_monitor_check():
     """Exécute une vérification manuelle des volumes manquants"""
     
@@ -461,6 +471,7 @@ def run_monitor_check():
 
 
 @missing_monitor_bp.route('/run-check-new-volumes', methods=['POST'])
+@login_required
 def run_new_volume_check():
     """Exécute une vérification manuelle des nouveaux volumes"""
     
@@ -487,6 +498,7 @@ def run_new_volume_check():
 
 
 @missing_monitor_bp.route('/stats', methods=['GET'])
+@login_required
 def get_monitor_stats():
     """Récupère les statistiques de surveillance"""
     
@@ -509,6 +521,7 @@ def get_monitor_stats():
 
 
 @missing_monitor_bp.route('/performance', methods=['GET'])
+@login_required
 def get_performance_stats():
     """Récupère les statistiques de performance du monitoring"""
     
@@ -539,6 +552,7 @@ def get_performance_stats():
 
 
 @missing_monitor_bp.route('/history', methods=['GET'])
+@login_required
 def get_download_history():
     """Récupère l'historique des téléchargements"""
     

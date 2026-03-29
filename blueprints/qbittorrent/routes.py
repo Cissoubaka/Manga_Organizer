@@ -2,6 +2,7 @@
 Routes pour l'intégration qBittorrent
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import qbittorrent_bp
 import json
 import os
@@ -54,6 +55,7 @@ def save_qbittorrent_config(config):
 
 
 @qbittorrent_bp.route('/config', methods=['GET', 'POST'])
+@login_required
 def qbittorrent_config():
     """Configuration qBittorrent"""
     
@@ -96,6 +98,7 @@ def qbittorrent_config():
 
 
 @qbittorrent_bp.route('/test', methods=['POST', 'GET'])
+@login_required
 def test_qbittorrent_connection():
     """Teste la connexion à qBittorrent"""
     try:
@@ -206,6 +209,7 @@ def test_qbittorrent_connection():
 
 
 @qbittorrent_bp.route('/categories_and_tags', methods=['GET'])
+@login_required
 def get_categories_and_tags():
     """Récupère les catégories et tags disponibles dans qBittorrent"""
     try:
@@ -353,6 +357,7 @@ def create_qbittorrent_session(config, for_test=False):
 
 
 @qbittorrent_bp.route('/add', methods=['POST'])
+@login_required
 def add_torrent():
     """Ajoute un torrent à qBittorrent
     

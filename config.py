@@ -3,13 +3,46 @@ Configuration centralisée de l'application
 """
 import os
 import sqlite3
+import sys
+
+def _get_secret_key():
+    """Génère ou récupère la SECRET_KEY de manière sécurisée"""
+    secret_key = os.environ.get('SECRET_KEY')
+    
+    # En production, SECRET_KEY DOIT être définie
+    if os.environ.get('FLASK_ENV') == 'production':
+        if not secret_key:
+            print("🔴 ERREUR: SECRET_KEY doit être définie en production!", file=sys.stderr)
+            print("Définiquez la variable d'environnement SECRET_KEY", file=sys.stderr)
+            raise ValueError("SECRET_KEY is required in production environment")
+        return secret_key
+    
+    # En développement, générer une clé aléatoire si pas définie
+    if not secret_key:
+        secret_key = os.urandom(32).hex()
+        print(f"🔑 SECRET_KEY générée pour le développement: {secret_key[:20]}...")
+    
+    return secret_key
 
 class Config:
     """Configuration de base"""
     
-    # Flask
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    DEBUG = True
+    # 🔐 SÉCURITÉ: SECRET_KEY générée ou récupérée depuis l'env
+    SECRET_KEY = _get_secret_key()
+    
+    # 🔐 SÉCURITÉ: DEBUG configurable, sensible à FLASK_ENV
+    DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 'yes']
+    
+    # 🔐 SÉCURITÉ: Session cookies sécurisés
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'  # HTTPS only
+    SESSION_COOKIE_HTTPONLY = True  # Pas d'accès via JavaScript
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Protection CSRF
+    SESSION_COOKIE_NAME = 'manga_organizer_session'
+    PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 jours
+    
+    # 🔐 SÉCURITÉ: CSRF Protection
+    # Note: Pour les APIs, désactiver par défaut et appliquer manuellement sur les formulaires HTML
+    WTF_CSRF_CHECK_DEFAULT = False  # Pas de vérif par défaut (à faire manuellement via @csrf.protect())
     
     # Chemins
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -23,6 +56,7 @@ class Config:
     # Fichiers de configuration
     CONFIG_FILE = os.path.join(DATA_DIR, 'emule_config.json')
     EBDZ_CONFIG_FILE = os.path.join(DATA_DIR, 'ebdz_config.json')
+    EBDZ_SCRAPE_HISTORY_FILE = os.path.join(DATA_DIR, 'ebdz_scrape_history.json')
     PROWLARR_CONFIG_FILE = os.path.join(DATA_DIR, 'prowlarr_config.json')
     MISSING_MONITOR_CONFIG_FILE = os.path.join(DATA_DIR, 'missing_monitor_config.json')
     LIBRARY_IMPORT_CONFIG_FILE = os.path.join(DATA_DIR, 'library_import_config.json')
@@ -239,11 +273,16 @@ class Config:
 class DevelopmentConfig(Config):
     """Configuration de développement"""
     DEBUG = True
+    # En dev, permettre le debug. SESSION_COOKIE_SECURE reste False pour http://localhost
+    SESSION_COOKIE_SECURE = False
 
 
 class ProductionConfig(Config):
     """Configuration de production"""
     DEBUG = False
+    # En production, forcer HTTPS et HTTPS-only cookies
+    SESSION_COOKIE_SECURE = True
+    TESTING = False
 
 
 config = {

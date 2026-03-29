@@ -1,4 +1,7 @@
 Flask==3.1.2
+Flask-CORS==4.0.0
+Flask-WTF==1.2.1
+Flask-Login==0.6.3
 Pillow==12.1.0
 PyPDF2==3.0.1
 rarfile==4.1
@@ -7,3 +10,4 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 cryptography==41.0.4
 APScheduler==3.10.4
+WTForms==3.1.1

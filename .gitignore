@@ -38,6 +38,15 @@ data/*.json
 data/covers/*
 !data/covers/.gitkeep
 
+# 🔐 SÉCURITÉ: Clés de chiffrement et secrets (NE PAS COMMITER!)
+data/.encryption_key
+data/.*
+data/.env
+.env.local
+.env.*.local
+
+reset_admin_password.py
+
 # IDE
 .vscode/
 .idea/

@@ -2,6 +2,7 @@
 Routes pour l'intégration Prowlarr
 """
 from flask import request, jsonify, current_app
+from flask_login import login_required
 from . import prowlarr_bp
 import json
 import os
@@ -54,6 +55,7 @@ def save_prowlarr_config(config):
 
 
 @prowlarr_bp.route('/config', methods=['GET', 'POST'])
+@login_required
 def prowlarr_config():
     """Configuration Prowlarr"""
     
@@ -92,6 +94,7 @@ def prowlarr_config():
 
 
 @prowlarr_bp.route('/test', methods=['POST', 'GET'])
+@login_required
 def test_prowlarr_connection():
     """Teste la connexion à Prowlarr"""
     try:
@@ -146,6 +149,7 @@ def test_prowlarr_connection():
 
 
 @prowlarr_bp.route('/search', methods=['GET'])
+@login_required
 def search_prowlarr():
     """Recherche sur les indexeurs Prowlarr"""
     
@@ -304,6 +308,7 @@ def search_prowlarr():
 
 
 @prowlarr_bp.route('/indexers', methods=['GET', 'POST'])
+@login_required
 def prowlarr_indexers():
     """Gère la liste des indexeurs Prowlarr"""
     

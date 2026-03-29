@@ -2,6 +2,7 @@
 Routes pour la recherche de liens ED2K
 """
 from flask import render_template, request, jsonify, current_app
+from flask_login import login_required
 from . import search_bp
 import sqlite3
 import requests
@@ -236,6 +237,7 @@ def discover_page():
 
 
 @search_bp.route('/api/search')
+@login_required
 def search_ed2k():
     """Recherche de liens ED2K et Prowlarr"""
     query = request.args.get('query', '').strip()
@@ -310,6 +312,7 @@ def search_ed2k():
 
 
 @search_bp.route('/api/search/ebdz')
+@login_required
 def search_ebdz_api():
     """API pour rechercher dans la base ED2K (pour la page discover)"""
     query = request.args.get('q', '').strip()
@@ -392,6 +395,7 @@ def search_ebdz_api():
 
 
 @search_bp.route('/api/search/prowlarr')
+@login_required
 def search_prowlarr_api():
     """API pour rechercher dans Prowlarr (pour la page discover)"""
     query = request.args.get('q', '').strip()

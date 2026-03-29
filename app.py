@@ -2,9 +2,15 @@
 Point d'entrée principal de l'application Manga Manager
 """
 from flask import Flask, send_from_directory, request, jsonify, redirect
-from config import config
+from dotenv import load_dotenv
 import os
 import sys
+
+# Charger les variables d'environnement depuis .env (dans le répertoire de l'app)
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(env_path)
+
+from config import config
 from encryption import ensure_encryption_key
 
 def create_app(config_name='default'):

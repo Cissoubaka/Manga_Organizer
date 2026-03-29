@@ -5,6 +5,11 @@ Usage: python run.py ou FLASK_ENV=production python app.py
 """
 import os
 import sys
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis .env (dans le répertoire de l'app)
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(env_path)
 
 if __name__ == '__main__':
     os.environ['FLASK_ENV'] = 'production'

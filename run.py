@@ -12,11 +12,14 @@ if __name__ == '__main__':
     
     app = create_app('production')
     
+    # Port configurable via variable d'environnement
+    port = int(os.environ.get('PORT', 5000))
+    
     print("=" * 60)
     print("Gestionnaire Multi-Bibliothèques Manga - PRODUCTION")
     print("=" * 60)
-    print("Accédez à http://localhost:5000")
+    print(f"Accédez à http://localhost:{port}")
     print("Écoute sur IPv4 uniquement")
     print("=" * 60)
     
-    app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False)
